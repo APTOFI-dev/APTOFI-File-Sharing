@@ -1,0 +1,50 @@
+# Visual Studio / build output
+.vs/
+bin/
+obj/
+Debug/
+Release/
+x64/
+x86/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# APTOFI File Sharing runtime data
+afsharing.settings
+*.db
+*.db-shm
+*.db-wal
+*.log
+logs/
+
+# Runtime storage metadata and temporary files
+uploads/
+temp/
+tmp/
+thumbnails/
+cache/
+
+# Certificates and private keys
+*.pfx
+*.p12
+*.pem
+*.key
+*.cer
+*.crt
+
+# SSH / DNS secrets
+*.ppk
+*.tsig
+*.secret
+
+# Runtime branding
+branding/
+
+# OS / editor files
+Thumbs.db
+Desktop.ini
+.DS_Store
+*.swp
+*.tmp
