@@ -1,0 +1,194 @@
+<Window x:Class="APTOFI.FileSharing.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="APTOFI File Sharing" Icon="afsharing.ico" Height="820" Width="1040" MinHeight="700" MinWidth="900" WindowStartupLocation="CenterScreen" Background="#F4F5F7">
+    <Window.Resources>
+        <Style TargetType="TextBox"><Setter Property="Height" Value="32"/><Setter Property="Margin" Value="4"/><Setter Property="Padding" Value="8,4"/></Style>
+        <Style TargetType="PasswordBox"><Setter Property="Height" Value="32"/><Setter Property="Margin" Value="4"/><Setter Property="Padding" Value="8,4"/></Style>
+        <Style TargetType="ComboBox"><Setter Property="Height" Value="32"/><Setter Property="Margin" Value="4"/></Style>
+        <Style TargetType="Button"><Setter Property="MinHeight" Value="32"/><Setter Property="Margin" Value="4"/><Setter Property="Padding" Value="12,4"/></Style>
+        <Style TargetType="CheckBox"><Setter Property="Margin" Value="6"/></Style>
+    </Window.Resources>
+    <Grid Margin="18">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <Grid Grid.Row="0" Margin="0,0,0,12">
+            <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+            <StackPanel>
+                <TextBlock x:Name="TitleText" FontSize="25" FontWeight="SemiBold" Foreground="#252832"/>
+                <StackPanel Orientation="Horizontal" Margin="0,5,0,0">
+                    <Ellipse x:Name="HeaderStatusDot" Width="10" Height="10" Fill="#A0A4AC" Margin="0,3,8,0"/>
+                    <TextBlock x:Name="StatusText" Foreground="#5D6270" FontSize="14"/>
+                </StackPanel>
+            </StackPanel>
+            <ComboBox x:Name="LanguageBox" Grid.Column="1" Width="170" Height="30" VerticalAlignment="Top" SelectionChanged="LanguageBox_OnSelectionChanged">
+                <ComboBoxItem Tag="ru">Русский</ComboBoxItem>
+                <ComboBoxItem Tag="en">English</ComboBoxItem>
+                <ComboBoxItem Tag="de">Deutsch</ComboBoxItem>
+                <ComboBoxItem Tag="uk">Українська</ComboBoxItem>
+                <ComboBoxItem Tag="ko">한국어</ComboBoxItem>
+                <ComboBoxItem Tag="zh">简体中文</ComboBoxItem>
+                <ComboBoxItem Tag="ja">日本語</ComboBoxItem>
+                <ComboBoxItem Tag="fr">Français</ComboBoxItem>
+                <ComboBoxItem Tag="pl">Polski</ComboBoxItem>
+                <ComboBoxItem Tag="tr">Türkçe</ComboBoxItem>
+            </ComboBox>
+        </Grid>
+        <Border Grid.Row="1" Background="White" CornerRadius="14" Padding="10">
+            <TabControl x:Name="MainTabs" Background="White" BorderThickness="0">
+                <TabItem x:Name="OverviewTab">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <StackPanel Margin="14">
+                            <Border Background="#F5F7F8" CornerRadius="12" Padding="16">
+                                <Grid>
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="180"/><ColumnDefinition/></Grid.ColumnDefinitions>
+                                    <StackPanel>
+                                        <TextBlock x:Name="OverviewStateLabel" FontWeight="SemiBold" FontSize="14"/>
+                                        <StackPanel Orientation="Horizontal" Margin="0,8,0,0"><Ellipse x:Name="OverviewStateDot" Width="18" Height="18" Fill="#A0A4AC"/><TextBlock x:Name="OverviewStateText" Margin="9,0,0,0" FontWeight="SemiBold" FontSize="18"/></StackPanel>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1">
+                                        <TextBlock x:Name="OverviewPublicLabel" FontWeight="SemiBold"/>
+                                        <Grid Margin="0,4,0,6">
+                                            <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                            <TextBox x:Name="OverviewPublicBox" IsReadOnly="True" FontSize="16" Margin="0" Padding="8,4"/>
+                                            <Button x:Name="CopyPublicButton" Grid.Column="1" Margin="8,0,0,0" Click="CopyPublicButton_OnClick"/>
+                                        </Grid>
+                                        <TextBlock x:Name="OverviewUserLoginLabel" FontWeight="SemiBold" Margin="0,8,0,0"/>
+                                        <Grid Margin="0,4,0,6">
+                                            <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                            <TextBox x:Name="OverviewUserLoginBox" IsReadOnly="True" FontSize="15" Margin="0" Padding="8,4"/>
+                                            <Button x:Name="CopyUserLoginButton" Grid.Column="1" Margin="8,0,0,0" Click="CopyUserLoginButton_OnClick"/>
+                                        </Grid>
+                                        <TextBlock x:Name="OverviewSchemeHint" Foreground="#5D6270" TextWrapping="Wrap" Margin="0,0,0,4"/>
+                                        <TextBlock x:Name="OverviewHttpsText" Foreground="#5D6270" TextWrapping="Wrap"/>
+                                        <Button x:Name="ConfigureHttpsButton" HorizontalAlignment="Left" Margin="0,10,0,0" Background="#FFD33D" FontWeight="SemiBold" Click="ConfigureHttpsButton_OnClick"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+                            <TextBlock x:Name="OverviewStorageLabel" FontSize="18" FontWeight="SemiBold" Margin="2,18,2,8"/>
+                            <StackPanel x:Name="StorageUsagePanel"/>
+                            <TextBlock x:Name="MessageText" TextWrapping="Wrap" Margin="4,16,4,4" Foreground="#5D6270"/>
+                        </StackPanel>
+                    </ScrollViewer>
+                </TabItem>
+                <TabItem x:Name="StorageTab">
+                    <Grid Margin="14">
+                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                        <TextBlock x:Name="StorageHintText" TextWrapping="Wrap" Foreground="#5D6270" Margin="4,0,4,10"/>
+                        <ListBox x:Name="StorageLocationsList" Grid.Row="1" MinHeight="180" Margin="4" SelectionChanged="StorageLocationsList_OnSelectionChanged"/>
+                        <StackPanel Grid.Row="2" Margin="0,8,0,0">
+                            <Border Background="#F5F7F8" CornerRadius="10" Padding="10" Margin="4">
+                                <Grid>
+                                    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                                    <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                    <StackPanel>
+                                        <TextBlock x:Name="SelectedStorageQuotaLabel" FontWeight="SemiBold" Margin="4,0,4,0"/>
+                                        <TextBox x:Name="SelectedStorageQuotaBox" Text="0"/>
+                                    </StackPanel>
+                                    <Button x:Name="ApplyStorageQuotaButton" Grid.Column="1" VerticalAlignment="Bottom" Click="ApplyStorageQuotaButton_OnClick"/>
+                                    <StackPanel Grid.Row="1" Grid.ColumnSpan="2" Margin="4,8,4,0">
+                                        <ProgressBar x:Name="SelectedStorageProgress" Height="12" Minimum="0" Maximum="100"/>
+                                        <TextBlock x:Name="SelectedStorageUsageText" Margin="0,5,0,0" Foreground="#5D6270" TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+                            <Grid>
+                                <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <TextBlock x:Name="ServerQuotaLabel" FontWeight="SemiBold" Margin="4,0,4,0"/>
+                                    <TextBox x:Name="ServerQuotaBox" Text="0"/>
+                                </StackPanel>
+                                <Button x:Name="AddStorageButton" Grid.Column="1" VerticalAlignment="Bottom" Click="AddStorageButton_OnClick"/>
+                                <Button x:Name="RemoveStorageButton" Grid.Column="2" VerticalAlignment="Bottom" Click="RemoveStorageButton_OnClick"/>
+                            </Grid>
+                        </StackPanel>
+                    </Grid>
+                </TabItem>
+                <TabItem x:Name="NetworkTab">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <StackPanel Margin="14">
+                            <TextBlock x:Name="PublicHintText" Foreground="#5D6270" TextWrapping="Wrap" Margin="4,0,4,10"/>
+                            <TextBlock x:Name="ModeLabel" FontWeight="SemiBold" Margin="4,4,4,0"/>
+                            <ComboBox x:Name="ModeBox" SelectionChanged="ModeBox_OnSelectionChanged"><ComboBoxItem Tag="Direct"/><ComboBoxItem Tag="Vps"/><ComboBoxItem Tag="Local"/></ComboBox>
+                            <Grid>
+                                <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions>
+                                <StackPanel><TextBlock x:Name="BindLabel" FontWeight="SemiBold" Margin="4,4,4,0"/><TextBox x:Name="BindBox" Text="0.0.0.0"/></StackPanel>
+                                <StackPanel Grid.Column="1"><TextBlock x:Name="PublicLabel" FontWeight="SemiBold" Margin="4,4,4,0"/><Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBox x:Name="PublicBox"/><Button x:Name="DetectButton" Grid.Column="1" Click="DetectButton_OnClick"/></Grid></StackPanel>
+                            </Grid>
+                            <Grid>
+                                <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions>
+                                <StackPanel><TextBlock x:Name="HttpLabel" FontWeight="SemiBold" Margin="4,4,4,0"/><TextBox x:Name="HttpPortBox" Text="15745"/></StackPanel>
+                                <StackPanel Grid.Column="1"><TextBlock x:Name="HttpsLabel" FontWeight="SemiBold" Margin="4,4,4,0"/><TextBox x:Name="HttpsPortBox" Text="15746"/></StackPanel>
+                            </Grid>
+                            <Grid>
+                                <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                <StackPanel><TextBlock x:Name="AdminPathLabel" FontWeight="SemiBold" Margin="4,4,4,0"/><TextBox x:Name="AdminPathBox"/></StackPanel>
+                                <Button x:Name="GenerateAdminButton" Grid.Column="1" VerticalAlignment="Bottom" Click="GenerateAdminButton_OnClick"/>
+                            </Grid>
+                            <Grid>
+                                <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                <StackPanel><TextBlock x:Name="UserPathLabel" FontWeight="SemiBold" Margin="4,4,4,0"/><TextBox x:Name="UserPathBox" Text="/user_login_disk"/></StackPanel>
+                                <Button x:Name="GenerateUserButton" Grid.Column="1" VerticalAlignment="Bottom" Click="GenerateUserButton_OnClick"/>
+                            </Grid>
+                            <Border x:Name="VpsPanel" Visibility="Collapsed" Background="#F5F7F8" CornerRadius="12" Padding="10" Margin="4,12,4,4">
+                                <StackPanel>
+                                    <TextBlock x:Name="VpsSectionLabel" FontSize="16" FontWeight="SemiBold" Margin="4,0,4,6"/>
+                                    <Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="160"/></Grid.ColumnDefinitions><StackPanel><TextBlock x:Name="VpsHostLabel" FontWeight="SemiBold" Margin="4,4,4,0"/><TextBox x:Name="VpsHostBox"/></StackPanel><StackPanel Grid.Column="1"><TextBlock x:Name="VpsPortLabel" FontWeight="SemiBold" Margin="4,4,4,0"/><TextBox x:Name="VpsPortBox" Text="22"/></StackPanel></Grid>
+                                    <Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions><StackPanel><TextBlock x:Name="VpsUserLabel" FontWeight="SemiBold" Margin="4,4,4,0"/><TextBox x:Name="VpsUserBox" Text="root"/></StackPanel><StackPanel Grid.Column="1"><TextBlock x:Name="VpsPasswordLabel" FontWeight="SemiBold" Margin="4,4,4,0"/><PasswordBox x:Name="VpsPasswordBox"/></StackPanel></Grid>
+                                    <CheckBox x:Name="VpsSudoBox" IsChecked="True"/>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </ScrollViewer>
+                </TabItem>
+                <TabItem x:Name="DomainTab">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <StackPanel Margin="14">
+                            <TextBlock x:Name="DomainHintText" Foreground="#5D6270" TextWrapping="Wrap" Margin="4,0,4,10"/>
+                            <TextBlock x:Name="DomainLabel" FontWeight="SemiBold" Margin="4,4,4,0"/><TextBox x:Name="DomainBox"/>
+                            <TextBlock x:Name="DnsModeLabel" FontWeight="SemiBold" Margin="4,8,4,0"/>
+                            <ComboBox x:Name="DnsModeBox" SelectionChanged="DnsModeBox_OnSelectionChanged"><ComboBoxItem Tag="Manual"/><ComboBoxItem Tag="Rfc2136"/></ComboBox>
+                            <Border x:Name="DnsPanel" Visibility="Collapsed" Background="#F5F7F8" CornerRadius="12" Padding="10" Margin="4,8,4,4">
+                                <StackPanel>
+                                    <Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions><StackPanel><TextBlock x:Name="DnsServerLabel" FontWeight="SemiBold" Margin="4,4,4,0"/><TextBox x:Name="DnsServerBox"/></StackPanel><StackPanel Grid.Column="1"><TextBlock x:Name="DnsZoneLabel" FontWeight="SemiBold" Margin="4,4,4,0"/><TextBox x:Name="DnsZoneBox"/></StackPanel></Grid>
+                                    <Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions><StackPanel><TextBlock x:Name="DnsKeyNameLabel" FontWeight="SemiBold" Margin="4,4,4,0"/><TextBox x:Name="DnsKeyNameBox"/></StackPanel><StackPanel Grid.Column="1"><TextBlock x:Name="DnsAlgorithmLabel" FontWeight="SemiBold" Margin="4,4,4,0"/><ComboBox x:Name="DnsAlgorithmBox"><ComboBoxItem Tag="hmac-sha256">HMAC-SHA256</ComboBoxItem><ComboBoxItem Tag="hmac-sha512">HMAC-SHA512</ComboBoxItem><ComboBoxItem Tag="hmac-sha1">HMAC-SHA1</ComboBoxItem></ComboBox></StackPanel></Grid>
+                                    <TextBlock x:Name="DnsSecretLabel" FontWeight="SemiBold" Margin="4,4,4,0"/><PasswordBox x:Name="DnsSecretBox"/>
+                                    <CheckBox x:Name="DnsAutoAddressBox" IsChecked="True"/>
+                                </StackPanel>
+                            </Border>
+                            <TextBlock x:Name="AcmeEmailLabel" FontWeight="SemiBold" Margin="4,10,4,0"/><TextBox x:Name="AcmeEmailBox"/>
+                            <CheckBox x:Name="AcmeTermsBox" IsChecked="True"/>
+
+                        </StackPanel>
+                    </ScrollViewer>
+                </TabItem>
+                <TabItem x:Name="AccountTab">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <StackPanel Margin="14">
+                            <TextBlock x:Name="EmailLabel" FontWeight="SemiBold" Margin="4,4,4,0"/><TextBox x:Name="EmailBox"/>
+                            <Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions><StackPanel><TextBlock x:Name="PasswordLabel" FontWeight="SemiBold" Margin="4,4,4,0"/><PasswordBox x:Name="PasswordBox"/></StackPanel><StackPanel Grid.Column="1"><TextBlock x:Name="RepeatLabel" FontWeight="SemiBold" Margin="4,4,4,0"/><PasswordBox x:Name="RepeatPasswordBox"/></StackPanel></Grid>
+                            <CheckBox x:Name="InstallServiceBox" IsChecked="True" IsEnabled="False"/>
+                            <CheckBox x:Name="TrayAutoStartBox" IsChecked="True"/>
+                            <TextBlock Margin="6,20,6,4"><Hyperlink x:Name="AuthorLink" RequestNavigate="AuthorLink_OnRequestNavigate">APTOFI.COM</Hyperlink></TextBlock>
+                        </StackPanel>
+                    </ScrollViewer>
+                </TabItem>
+                <TabItem x:Name="LogsTab">
+                    <Grid Margin="14">
+                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+                        <StackPanel Orientation="Horizontal"><Button x:Name="CopyLogButton" Click="CopyLogButton_OnClick"/><Button x:Name="OpenLogsButton" Click="OpenLogsButton_OnClick"/></StackPanel>
+                        <TextBox x:Name="LogTextBox" Grid.Row="1" Height="Auto" MinHeight="420" Margin="4,10,4,4" Padding="10" AcceptsReturn="True" IsReadOnly="True" VerticalAlignment="Stretch" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" FontFamily="Consolas" TextWrapping="Wrap"/>
+                    </Grid>
+                </TabItem>
+            </TabControl>
+        </Border>
+        <Grid Grid.Row="2" Margin="0,12,0,0">
+            <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+            <StackPanel Orientation="Horizontal"><Button x:Name="OpenAdminButton" Click="OpenAdminButton_OnClick"/><Button x:Name="OpenUserButton" Click="OpenUserButton_OnClick"/><Button x:Name="ServiceToggleButton" Click="ServiceToggleButton_OnClick"/><Button x:Name="MinimizeTrayButton" Click="MinimizeTrayButton_OnClick"/></StackPanel>
+            <StackPanel Grid.Column="1" Orientation="Horizontal"><Button x:Name="SaveButton" Click="SaveButton_OnClick"/><Button x:Name="ApplyButton" Background="#FFD33D" FontWeight="SemiBold" Click="ApplyButton_OnClick"/></StackPanel>
+        </Grid>
+    </Grid>
+</Window>

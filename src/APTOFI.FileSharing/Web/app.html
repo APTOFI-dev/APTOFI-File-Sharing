@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<title>__SITE_NAME__</title>
+<link rel="icon" href="/favicon.ico?v=__VERSION__"><link rel="stylesheet" href="/assets/style.css?v=__VERSION__">
+</head>
+<body data-mode="__MODE__" data-version="__VERSION__" data-author-url="__AUTHOR_URL__">
+<div id="loginView" class="login-shell">
+  <div class="login-card">
+    <div class="brand-row"><div class="brand-mark"><img class="brand-image" src="/branding/logo?v=__VERSION__" alt=""><span>A</span></div><div><div class="brand-name">__SITE_NAME__</div><div id="loginKind" class="muted"></div></div></div>
+    <div class="field"><label data-l="email"></label><input id="loginEmail" type="email" autocomplete="username"></div>
+    <div class="field"><label data-l="password"></label><input id="loginPassword" type="password" autocomplete="current-password"></div>
+    <button id="loginButton" class="btn primary wide" data-l="signIn"></button>
+    <div id="loginError" class="error-text"></div>
+    <div class="login-bottom"><select id="loginLanguage" class="language-select"></select><a class="author" href="__AUTHOR_URL__" target="_blank" rel="noopener">APTOFI.COM</a></div>
+  </div>
+</div>
+<div id="appView" class="app-shell hidden">
+  <aside class="sidebar">
+    <div class="brand-row sidebar-brand"><div class="brand-mark"><img class="brand-image" src="/branding/logo?v=__VERSION__" alt=""><span>A</span></div><div class="brand-name">__SITE_NAME__</div></div>
+    <button id="uploadButton" class="btn primary wide"><span>↑</span><span data-l="upload"></span></button>
+    <button id="newFolderButton" class="btn soft wide"><span>＋</span><span data-l="newFolder"></span></button>
+    <input id="filePicker" type="file" multiple class="hidden">
+    <nav class="side-nav">
+      <button class="nav-item active" data-section="files"><span>▰</span><span data-l="myFiles"></span></button>
+      <button class="nav-item" data-section="shared"><span>↗</span><span data-l="shared"></span></button>
+      <button class="nav-item" data-section="profile"><span>◎</span><span data-l="profile"></span></button>
+      <button id="adminNav" class="nav-item hidden" data-section="admin"><span>⚙</span><span data-l="administration"></span></button>
+      <button id="trashNav" class="nav-item hidden" data-section="trash"><span>♲</span><span data-l="trash"></span></button>
+    </nav>
+    <button id="logoutButton" class="logout-button"><span>⇥</span><span data-l="logout"></span></button>
+    <div class="quota-card">
+      <div class="quota-title" data-l="storage"></div>
+      <div class="progress"><div id="quotaBar" class="progress-bar"></div></div>
+      <div id="quotaText" class="quota-text"></div>
+    </div>
+    <div class="sidebar-bottom"><a href="__AUTHOR_URL__" target="_blank" rel="noopener">APTOFI.COM</a><span>v__VERSION__</span></div>
+  </aside>
+  <main class="main">
+    <header class="topbar">
+      <div class="top-left"><button id="backButton" class="icon-btn hidden">←</button><div><div id="pageTitle" class="page-title"></div><div id="breadcrumb" class="breadcrumb"></div></div></div>
+      <div class="top-actions"><input id="searchBox" class="search" data-l-placeholder="search" type="search"><button id="listModeButton" class="icon-btn selected" data-l-title="list">☷</button><button id="gridModeButton" class="icon-btn" data-l-title="grid">▦</button><button id="compactModeButton" class="icon-btn compact-mode-button" data-l-title="compactView">≣</button><select id="languageBox" class="language-select"></select><button id="accountButton" class="account-button"></button></div>
+    </header>
+    <section id="filesSection" class="section">
+      <div id="dropZone" class="drop-zone hidden"><div class="drop-icon">↑</div><div data-l="dropFiles"></div></div>
+      <div id="emptyState" class="empty-state hidden"><div class="empty-icon">▰</div><div class="empty-title" data-l="emptyFolder"></div><div class="muted" data-l="emptyFolderHint"></div></div>
+      <div id="items" class="items list-mode"></div>
+    </section>
+    <section id="sharedSection" class="section hidden"><div class="panel"><div class="panel-title" data-l="sharedLinks"></div><div id="sharesList" class="table-list"></div></div></section>
+    <section id="trashSection" class="section hidden">
+      <div class="trash-banner">
+        <div class="trash-banner-copy"><strong data-l="trash"></strong><span data-l="trashBanner"></span><span id="trashQuotaInfo" class="trash-quota-info"></span></div>
+        <button id="emptyTrashButton" class="btn danger" data-l="emptyTrash"></button>
+      </div>
+      <div id="trashList" class="trash-list"></div>
+      <div id="trashEmptyState" class="empty-state hidden"><div class="empty-icon">♲</div><div class="empty-title" data-l="trashEmpty"></div><div class="muted" data-l="trashEmptyHint"></div></div>
+    </section>
+    <section id="profileSection" class="section hidden">
+      <div class="settings-grid">
+        <div class="panel"><div class="panel-title" data-l="changeEmail"></div><div class="field"><label data-l="newEmail"></label><input id="profileEmail" type="email"></div><div class="field"><label data-l="currentPassword"></label><input id="profileEmailPassword" type="password"></div><button id="saveEmailButton" class="btn primary" data-l="save"></button></div>
+        <div class="panel"><div class="panel-title" data-l="changePassword"></div><div class="field"><label data-l="currentPassword"></label><input id="profileCurrentPassword" type="password"></div><div class="field"><label data-l="newPassword"></label><input id="profileNewPassword" type="password"></div><button id="savePasswordButton" class="btn primary" data-l="save"></button></div>
+        <div class="panel mobile-logout-panel"><div class="panel-title" data-l="account"></div><button id="profileLogoutButton" class="btn danger wide" data-l="logout"></button></div>
+      </div>
+    </section>
+    <section id="adminSection" class="section hidden">
+      <div class="admin-tabs"><button class="tab active" data-admin-tab="overview" data-l="overview"></button><button class="tab" data-admin-tab="users" data-l="users"></button><button class="tab" data-admin-tab="settings" data-l="settings"></button><button class="tab" data-admin-tab="diagnostics" data-l="diagnostics"></button><button class="tab" data-admin-tab="security" data-l="security"></button></div>
+      <div id="adminOverview" class="admin-pane"></div>
+      <div id="adminUsers" class="admin-pane hidden"></div>
+      <div id="adminSettings" class="admin-pane hidden"></div>
+      <div id="adminDiagnostics" class="admin-pane hidden"></div>
+      <div id="adminSecurity" class="admin-pane hidden"></div>
+    </section>
+  </main>
+  <div id="transferPanel" class="transfer-panel transfer-window hidden" role="region" aria-live="polite">
+    <div id="transferDragHandle" class="transfer-window-head">
+      <div class="transfer-window-title"><span class="transfer-drag-grip" aria-hidden="true">⋮⋮</span><strong data-l="uploads"></strong><span id="transferWindowCount" class="transfer-window-count"></span></div>
+      <div class="transfer-window-head-actions"><button id="transferCollapseButton" type="button" class="transfer-collapse-btn" data-l="collapse"></button></div>
+    </div>
+    <div id="transferBatches" class="transfer-batches"></div>
+  </div>
+</div>
+<div id="modalBackdrop" class="modal-backdrop hidden"><div id="modal" class="modal"></div></div>
+<div id="toast" class="toast hidden"></div>
+<div id="busyOverlay" class="busy-overlay hidden" role="status" aria-live="polite" aria-busy="true"><div class="busy-card"><div class="busy-visual" aria-hidden="true"><div class="busy-orbit"><span></span><span></span><span></span><b>A</b></div><div class="busy-dots"><i></i><i></i><i></i></div></div><div class="busy-copy"><strong id="busyTitle"></strong><span id="busyHint"></span><span id="busyElapsed" class="busy-elapsed"></span><div class="busy-track"><div></div></div></div></div></div>
+<script src="/assets/locales.js?v=__VERSION__"></script>
+<script src="/assets/app.js?v=__VERSION__"></script>
+</body>
+</html>
