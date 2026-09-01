@@ -136,7 +136,23 @@ Project attribution is explicit and documented: **APTOFI.COM — https://aptofi.
 
 ## Screenshots
 
-Place project screenshots in `docs/screenshots/`. They can be linked here before publishing the repository.
+### Web interface
+
+A clean responsive browser interface for files, folders, sharing and administration. Works on desktop, tablet and mobile devices.
+
+![APTOFI File Sharing web interface](docs/screenshots/01-web-interface.png)
+
+### Windows control panel
+
+The Windows application manages storage, network access, domains, HTTPS, the Windows service and server startup from one place.
+
+![APTOFI File Sharing Windows control panel](docs/screenshots/02-windows-control-panel.png)
+
+### Secure user login
+
+Separate protected entry points can be configured for users and administrators. The interface and authentication page support all built-in languages.
+
+![APTOFI File Sharing login page](docs/screenshots/03-login-page.png)
 
 ## License
 
