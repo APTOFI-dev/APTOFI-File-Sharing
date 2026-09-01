@@ -154,6 +154,12 @@ Separate protected entry points can be configured for users and administrators. 
 
 ![APTOFI File Sharing login page](docs/screenshots/03-login-page.png)
 
+## Disclaimer
+
+APTOFI File Sharing is provided **"AS IS"**, without warranty of any kind, express or implied, including warranties of merchantability, fitness for a particular purpose and non-infringement. To the maximum extent permitted by applicable law, the authors and copyright holders shall not be liable for claims, damages, data loss, service interruption or other liability arising from the software or its use.
+
+You are responsible for your own server configuration, network exposure, firewall rules, DNS, TLS certificates, access credentials, storage health and backups. Test the deployment and recovery procedure before relying on it for important data.
+
 ## License
 
 Use, modification and redistribution are allowed under the included **APTOFI Attribution License 1.0**. Attribution to **APTOFI.COM** with the link **https://aptofi.com** is mandatory.
