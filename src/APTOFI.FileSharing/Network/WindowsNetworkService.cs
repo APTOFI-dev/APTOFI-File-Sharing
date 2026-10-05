@@ -1,3 +1,7 @@
+// Date: 2026-08-07
+// Time: 09:34:29 Europe/London
+// File version: 1.0.0
+// Description: Configures Windows Firewall, HTTP.sys TLS bindings and inspects local TCP port ownership.
 using System;
 using System.Diagnostics;
 using System.Globalization;

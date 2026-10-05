@@ -1,3 +1,7 @@
+// Date: 2026-08-07
+// Time: 09:34:29 Europe/London
+// File version: 1.0.0
+// Description: Creates secure browser sessions and validates session cookies and CSRF tokens.
 using System;
 using System.Net;
 using APTOFI.FileSharing.Core;

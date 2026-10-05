@@ -1,4 +1,4 @@
-# APTOFI File Sharing 1.1.35
+# APTOFI File Sharing 1.1.36
 
 [English](../README.md) · [Русский](README.ru.md) · [Deutsch](README.de.md) · [Українська](README.uk.md) · [Français](README.fr.md) · **Polski** · [Türkçe](README.tr.md) · [한국어](README.ko.md) · [中文](README.zh.md) · [日本語](README.ja.md)
 
@@ -73,3 +73,7 @@ Atrybucja projektu jest jawnie opisana: **APTOFI.COM — https://aptofi.com**.
 ## Licencja
 
 Używanie, modyfikacja i dystrybucja są dozwolone zgodnie z **APTOFI Attribution License 1.0** pod warunkiem zachowania autorstwa i linku **https://aptofi.com**.
+
+## Rotacja logów i dziennik dostępu
+
+W wersji 1.1.36 dodano wbudowaną, konfigurowalną rotację logów i kompaktowy tryb access-log według adresu IP. Domyślnie: 7 dni przechowywania, 20 MiB na plik, 150 MiB dla folderu `logs`, kontrola rotacji co 60 minut oraz agregacja jednego IP po 30 minutach bezczynności. Na karcie **Logs** administrator może zmienić te wartości lub włączyć pełne logowanie każdego żądania HTTP. Sekretne ścieżki administratora/użytkowników oraz tokeny publicznych linków są maskowane w logowanych ścieżkach.

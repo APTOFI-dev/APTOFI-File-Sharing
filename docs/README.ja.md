@@ -1,4 +1,4 @@
-# APTOFI File Sharing 1.1.35
+# APTOFI File Sharing 1.1.36
 
 [English](../README.md) · [Русский](README.ru.md) · [Deutsch](README.de.md) · [Українська](README.uk.md) · [Français](README.fr.md) · [Polski](README.pl.md) · [Türkçe](README.tr.md) · [한국어](README.ko.md) · [中文](README.zh.md) · **日本語**
 
@@ -73,3 +73,7 @@ Ubuntu/Debian VPS の SSH host/port/user、パスワードまたは鍵、remote 
 ## ライセンス
 
 **APTOFI Attribution License 1.0** により使用・変更・再配布可能ですが、**APTOFI.COM** と **https://aptofi.com** の表示が必須です。
+
+## ログローテーションとアクセスログ
+
+1.1.36 には設定可能な内蔵ログローテーションと IP ごとのコンパクトなアクセスログが含まれます。既定値は、保存 7 日、1 ファイル 20 MiB、`logs` フォルダー全体 150 MiB、60 分ごとのローテーション確認、同一 IP が 30 分間非アクティブになった後の 1 行集約です。管理者は **Logs** タブで値を変更したり、すべての HTTP リクエストを記録する完全モードへ切り替えたりできます。管理者/ユーザーの秘密パスと公開共有トークンはログ内のパスでマスクされます。

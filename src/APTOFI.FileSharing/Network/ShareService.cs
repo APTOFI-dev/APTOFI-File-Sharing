@@ -1,3 +1,7 @@
+// Date: 2026-08-25
+// Time: 03:47:00 Europe/London
+// File version: 1.1.34
+// Description: Creates public links and streams resilient ZIP64 archives for folders or mouse-selected private items without temporary archive files.
 using System;
 using System.Collections.Generic;
 using System.Collections.Concurrent;

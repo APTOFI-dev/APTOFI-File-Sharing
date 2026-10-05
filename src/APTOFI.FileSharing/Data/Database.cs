@@ -1,3 +1,7 @@
+// Date: 2026-08-21
+// Time: 07:55:50 Europe/London
+// File version: 1.1.34
+// Description: Opens, indexes and migrates the encrypted LiteDB database, including legacy recycle-bin metadata and settings.
 using System;
 using System.Collections.Generic;
 using APTOFI.FileSharing.Core;
@@ -160,6 +164,36 @@ namespace APTOFI.FileSharing.Data
             if (!doc.ContainsKey("TrashEnabled"))
             {
                 doc["TrashEnabled"] = false;
+                changed = true;
+            }
+            if (!doc.ContainsKey("LogRetentionDays"))
+            {
+                doc["LogRetentionDays"] = 7;
+                changed = true;
+            }
+            if (!doc.ContainsKey("LogMaxFileMiB"))
+            {
+                doc["LogMaxFileMiB"] = 20;
+                changed = true;
+            }
+            if (!doc.ContainsKey("LogMaxDirectoryMiB"))
+            {
+                doc["LogMaxDirectoryMiB"] = 150;
+                changed = true;
+            }
+            if (!doc.ContainsKey("LogMaintenanceIntervalMinutes"))
+            {
+                doc["LogMaintenanceIntervalMinutes"] = 60;
+                changed = true;
+            }
+            if (!doc.ContainsKey("AccessLogMode"))
+            {
+                doc["AccessLogMode"] = "Compact";
+                changed = true;
+            }
+            if (!doc.ContainsKey("AccessLogAggregateMinutes"))
+            {
+                doc["AccessLogAggregateMinutes"] = 30;
                 changed = true;
             }
             if (!doc.ContainsKey("DnsUpdateMode") && doc.ContainsKey("Dynv6Zone"))

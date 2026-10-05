@@ -1,4 +1,4 @@
-# APTOFI File Sharing 1.1.35
+# APTOFI File Sharing 1.1.36
 
 [English](../README.md) · [Русский](README.ru.md) · [Deutsch](README.de.md) · [Українська](README.uk.md) · [Français](README.fr.md) · [Polski](README.pl.md) · [Türkçe](README.tr.md) · **한국어** · [中文](README.zh.md) · [日本語](README.ja.md)
 
@@ -73,3 +73,7 @@ Ubuntu/Debian VPS의 SSH host/port/user, password/key, remote port(예: `18080`)
 ## 라이선스
 
 **APTOFI Attribution License 1.0**에 따라 사용/수정/배포할 수 있으며 **APTOFI.COM** 및 **https://aptofi.com** 표기가 필수입니다.
+
+## 로그 순환 및 액세스 로그
+
+1.1.36에는 설정 가능한 내장 로그 순환과 IP별 압축 액세스 로그가 포함됩니다. 기본값은 보관 7일, 파일당 20 MiB, `logs` 폴더 전체 150 MiB, 60분마다 순환 점검, 동일 IP가 30분 동안 비활성 상태가 된 뒤 하나의 요약 행으로 집계입니다. 관리자는 **Logs** 탭에서 값을 변경하거나 모든 HTTP 요청을 기록하는 전체 모드를 사용할 수 있습니다. 관리자/사용자 비밀 경로와 공개 공유 토큰은 로그 경로에서 마스킹됩니다.

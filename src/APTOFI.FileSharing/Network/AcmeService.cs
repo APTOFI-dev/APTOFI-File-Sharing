@@ -1,3 +1,7 @@
+// Date: 2026-08-20
+// Time: 05:44:27 Europe/London
+// File version: 1.1.2
+// Description: Implements ACME HTTP-01 and RFC2136 TSIG DNS-01 issuance with exact JOSE content type, DNS provider diagnostics and automatic HTTPS binding.
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -60,7 +64,12 @@ namespace APTOFI.FileSharing.Network
 
         public Task<DnsUpdateResult> SyncPublicDnsAsync()
         {
-            return _dns.UpdateAddressAsync(_db.GetSettings());
+            return SyncPublicDnsAsync(false);
+        }
+
+        public Task<DnsUpdateResult> SyncPublicDnsAsync(bool background)
+        {
+            return _dns.UpdateAddressAsync(_db.GetSettings(), background);
         }
 
         public async Task<CertificateIssueResult> EnsureCertificateAsync(bool force)

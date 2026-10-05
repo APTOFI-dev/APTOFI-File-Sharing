@@ -1,4 +1,4 @@
-# APTOFI File Sharing 1.1.35
+# APTOFI File Sharing 1.1.36
 
 [English](../README.md) · [Русский](README.ru.md) · [Deutsch](README.de.md) · [Українська](README.uk.md) · **Français** · [Polski](README.pl.md) · [Türkçe](README.tr.md) · [한국어](README.ko.md) · [中文](README.zh.md) · [日本語](README.ja.md)
 
@@ -73,3 +73,7 @@ L’attribution du projet est explicitement documentée : **APTOFI.COM — https
 ## Licence
 
 Utilisation, modification et redistribution autorisées selon **APTOFI Attribution License 1.0**, avec attribution obligatoire à **APTOFI.COM** et lien **https://aptofi.com**.
+
+## Rotation des journaux et journal d’accès
+
+La version 1.1.36 intègre une rotation configurable des journaux et un mode d’accès compact par IP. Valeurs par défaut : conservation 7 jours, 20 Mio par fichier, 150 Mio pour le dossier `logs`, contrôle toutes les 60 minutes et regroupement d’une IP après 30 minutes d’inactivité. Dans l’onglet **Logs**, l’administrateur peut modifier ces valeurs ou activer le mode complet qui enregistre chaque requête HTTP. Les chemins secrets administrateur/utilisateur et les jetons de partage public sont masqués dans les chemins journalisés.

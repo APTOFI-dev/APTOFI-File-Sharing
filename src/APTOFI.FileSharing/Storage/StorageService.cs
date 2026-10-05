@@ -1,3 +1,7 @@
+// Date: 2026-08-25
+// Time: 06:51:00 Europe/London
+// File version: 1.1.34
+// Description: Manages isolated storage, recycle-bin lifecycle, legacy-active metadata compatibility, random physical names and recursive folder statistics across multiple storage locations.
 using System;
 using System.Collections.Generic;
 using System.IO;

@@ -1,4 +1,9 @@
+// Date: 2026-10-05
+// Time: 09:25:00 +07:00
+// File version: 1.1.36
+// Description: Manages provider-independent RFC2136 DNS updates with resilient public-IP detection and quiet best-effort background synchronization.
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net;
@@ -71,7 +76,12 @@ namespace APTOFI.FileSharing.Network
             throw new InvalidOperationException("Unsupported TSIG algorithm. Use hmac-sha1, hmac-sha256 or hmac-sha512.");
         }
 
-        public async Task<DnsUpdateResult> UpdateAddressAsync(AppSettings settings)
+        public Task<DnsUpdateResult> UpdateAddressAsync(AppSettings settings)
+        {
+            return UpdateAddressAsync(settings, false);
+        }
+
+        public async Task<DnsUpdateResult> UpdateAddressAsync(AppSettings settings, bool background)
         {
             if (!IsConfigured(settings))
                 return DnsUpdateResult.Fail("RFC2136 DNS update is not configured.");
@@ -82,28 +92,48 @@ namespace APTOFI.FileSharing.Network
                 var zone = NormalizeZone(settings.DnsZone);
                 var keyName = NormalizeKeyName(settings.DnsTsigKeyName);
                 var secret = ReadSecret(settings);
-                var publicIpText = (await _http.GetStringAsync("https://api.ipify.org").ConfigureAwait(false)).Trim();
-                if (!IPAddress.TryParse(publicIpText, out var publicIp) || publicIp.AddressFamily != AddressFamily.InterNetwork)
-                    throw new InvalidOperationException("The detected public IPv4 address is invalid: " + publicIpText);
+                var publicIp = await PublicIpDetector.DetectIpv4Async(background ? TimeSpan.FromSeconds(4) : TimeSpan.FromSeconds(8)).ConfigureAwait(false);
                 var domain = NormalizeZone(settings.Domain ?? settings.DnsZone);
                 var client = new Rfc2136TsigClient(NormalizeServer(settings.DnsServer), zone, keyName, secret, settings.DnsTsigAlgorithm);
-                await client.ReplaceAAsync(domain, publicIp).ConfigureAwait(false);
+                var needsUpdate = true;
+                try
+                {
+                    var existingAddress = await client.QueryAAsync(domain).ConfigureAwait(false);
+                    needsUpdate = existingAddress == null || !existingAddress.Equals(publicIp);
+                }
+                catch
+                {
+                    needsUpdate = true;
+                }
+                if (needsUpdate)
+                    await client.ReplaceAAsync(domain, publicIp).ConfigureAwait(false);
+
                 settings.Domain = NormalizeZone(settings.Domain ?? zone);
                 settings.HttpsIdentifier = settings.Domain;
                 settings.LastDnsError = null;
                 settings.LastDnsUpdateUtc = DateTime.UtcNow;
                 _db.SaveSettings(settings);
+
                 var currentAddress = publicIp.ToString();
-                if (!string.Equals(_lastSuccessfulAddress, currentAddress, StringComparison.Ordinal))
+                if (needsUpdate)
+                {
                     _log.App("dns-address-updated domain=" + zone + " ip=" + currentAddress);
+                }
+                else if (!background && !string.Equals(_lastSuccessfulAddress, currentAddress, StringComparison.Ordinal))
+                {
+                    _log.App("dns-address-current domain=" + zone + " ip=" + currentAddress);
+                }
                 _lastSuccessfulAddress = currentAddress;
                 return DnsUpdateResult.Ok(settings.Domain, currentAddress);
             }
             catch (Exception ex)
             {
-                settings.LastDnsError = ex.Message;
-                _db.SaveSettings(settings);
-                _log.App("dns-address-error " + ex);
+                if (!background)
+                {
+                    settings.LastDnsError = ex.Message;
+                    _db.SaveSettings(settings);
+                    _log.App("dns-address-error " + ex.GetType().Name + ": " + ex.Message);
+                }
                 return DnsUpdateResult.Fail(ex.Message);
             }
         }
@@ -122,19 +152,11 @@ namespace APTOFI.FileSharing.Network
             var recordName = "_acme-challenge." + domain;
             try
             {
-                await client.AddTxtAsync(recordName, value, 60).ConfigureAwait(false);
+                await client.ReplaceTxtAsync(recordName, value, 60).ConfigureAwait(false);
             }
-            catch (Exception firstError)
+            catch (Exception ex)
             {
-                try
-                {
-                    await client.DeleteTxtAsync(recordName).ConfigureAwait(false);
-                    await client.AddTxtAsync(recordName, value, 60).ConfigureAwait(false);
-                }
-                catch (Exception retryError)
-                {
-                    throw new InvalidOperationException("DNS-01 TXT update failed. First attempt: " + firstError.Message + " Retry after TXT cleanup: " + retryError.Message);
-                }
+                throw new InvalidOperationException("DNS-01 TXT update failed: " + ex.Message, ex);
             }
             _log.App("dns-txt-set domain=" + zone);
         }
@@ -155,7 +177,7 @@ namespace APTOFI.FileSharing.Network
             }
             catch (Exception ex)
             {
-                _log.App("dns-txt-clear-error " + ex.Message);
+                _log.App("dns-txt-clear-warning " + ex.Message);
             }
         }
 
@@ -225,12 +247,14 @@ namespace APTOFI.FileSharing.Network
                 var zone = NormalizeZone(settings.DnsZone);
                 if (!string.Equals(domain, zone, StringComparison.OrdinalIgnoreCase) && !domain.EndsWith("." + zone, StringComparison.OrdinalIgnoreCase))
                     return DnsUpdateResult.Fail("The configured domain is not inside the configured RFC2136 DNS zone.");
-                var addresses = await Dns.GetHostAddressesAsync(domain).ConfigureAwait(false);
-                var ipv4 = addresses.FirstOrDefault(x => x.AddressFamily == AddressFamily.InterNetwork);
+                var keyName = NormalizeKeyName(settings.DnsTsigKeyName);
+                var secret = ReadSecret(settings);
+                var client = new Rfc2136TsigClient(NormalizeServer(settings.DnsServer), zone, keyName, secret, settings.DnsTsigAlgorithm);
+                var ipv4 = await client.QueryAAsync(domain).ConfigureAwait(false);
                 if (ipv4 == null)
-                    return DnsUpdateResult.Fail("The configured domain does not currently resolve to an IPv4 address.");
+                    return DnsUpdateResult.Fail("The authoritative DNS server did not return an IPv4 A record for the configured domain.");
                 if (settings.DnsAutoUpdateAddress && !string.Equals(ipv4.ToString(), update.Details, StringComparison.OrdinalIgnoreCase))
-                    return DnsUpdateResult.Fail("The configured domain still resolves to " + ipv4 + " instead of " + update.Details + ". DNS propagation may still be in progress.");
+                    return DnsUpdateResult.Fail("The authoritative DNS server still returns " + ipv4 + " instead of " + update.Details + ".");
                 settings.LastDnsError = null;
                 settings.LastDnsUpdateUtc = DateTime.UtcNow;
                 _db.SaveSettings(settings);
@@ -335,18 +359,87 @@ namespace APTOFI.FileSharing.Network
 
             public Task AddTxtAsync(string name, string value, uint ttl)
             {
+                return SendUpdateAsync(new[] { UpdateRecord.Add(NormalizeRecordName(name), TypeTxt, ttl, BuildTxtData(value)) });
+            }
+
+            public Task ReplaceTxtAsync(string name, string value, uint ttl)
+            {
+                var normalized = NormalizeRecordName(name);
+                return SendUpdateAsync(new[]
+                {
+                    UpdateRecord.DeleteSet(normalized, TypeTxt),
+                    UpdateRecord.Add(normalized, TypeTxt, ttl, BuildTxtData(value))
+                });
+            }
+
+            private static byte[] BuildTxtData(string value)
+            {
                 var bytes = Encoding.UTF8.GetBytes(value ?? string.Empty);
                 if (bytes.Length > 255)
                     throw new InvalidOperationException("TXT values longer than 255 bytes are not supported.");
                 var data = new byte[bytes.Length + 1];
                 data[0] = (byte)bytes.Length;
                 Buffer.BlockCopy(bytes, 0, data, 1, bytes.Length);
-                return SendUpdateAsync(new[] { UpdateRecord.Add(NormalizeRecordName(name), TypeTxt, ttl, data) });
+                return data;
             }
 
             public Task DeleteTxtAsync(string name)
             {
                 return SendUpdateAsync(new[] { UpdateRecord.DeleteSet(NormalizeRecordName(name), TypeTxt) });
+            }
+
+            public async Task<IPAddress> QueryAAsync(string name)
+            {
+                var idBytes = new byte[2];
+                using (var rng = RandomNumberGenerator.Create())
+                    rng.GetBytes(idBytes);
+                var id = (ushort)((idBytes[0] << 8) | idBytes[1]);
+                byte[] query;
+                using (var ms = new MemoryStream())
+                {
+                    WriteU16(ms, id);
+                    WriteU16(ms, 0);
+                    WriteU16(ms, 1);
+                    WriteU16(ms, 0);
+                    WriteU16(ms, 0);
+                    WriteU16(ms, 0);
+                    WriteName(ms, NormalizeRecordName(name));
+                    WriteU16(ms, TypeA);
+                    WriteU16(ms, ClassIn);
+                    query = ms.ToArray();
+                }
+                var response = await SendTcpAsync(query).ConfigureAwait(false);
+                ValidateResponse(response, id);
+                var offset = 12;
+                var questions = ReadU16(response, 4);
+                var answers = ReadU16(response, 6);
+                for (var i = 0; i < questions; i++)
+                {
+                    SkipName(response, ref offset);
+                    if (offset + 4 > response.Length)
+                        throw new InvalidOperationException("DNS query response is truncated in the question section.");
+                    offset += 4;
+                }
+                for (var i = 0; i < answers; i++)
+                {
+                    SkipName(response, ref offset);
+                    if (offset + 10 > response.Length)
+                        throw new InvalidOperationException("DNS query response is truncated in the answer section.");
+                    var type = ReadU16(response, offset); offset += 2;
+                    var dnsClass = ReadU16(response, offset); offset += 2;
+                    offset += 4;
+                    var dataLength = ReadU16(response, offset); offset += 2;
+                    if (offset + dataLength > response.Length)
+                        throw new InvalidOperationException("DNS query response contains an invalid record length.");
+                    if (type == TypeA && dnsClass == ClassIn && dataLength == 4)
+                    {
+                        var bytes = new byte[4];
+                        Buffer.BlockCopy(response, offset, bytes, 0, 4);
+                        return new IPAddress(bytes);
+                    }
+                    offset += dataLength;
+                }
+                return null;
             }
 
             private async Task SendUpdateAsync(UpdateRecord[] updates)
@@ -407,11 +500,12 @@ namespace APTOFI.FileSharing.Network
                     WriteU16(ms, 0);
                     WriteU16(ms, (ushort)updates.Length);
                     WriteU16(ms, 0);
-                    WriteName(ms, _zone);
+                    var compression = new Dictionary<string, int>(StringComparer.Ordinal);
+                    WriteCompressedName(ms, _zone, compression);
                     WriteU16(ms, TypeSoa);
                     WriteU16(ms, ClassIn);
                     foreach (var update in updates)
-                        WriteUpdate(ms, update);
+                        WriteUpdate(ms, update, compression);
                     return ms.ToArray();
                 }
             }
@@ -483,26 +577,47 @@ namespace APTOFI.FileSharing.Network
 
             private async Task<byte[]> SendTcpAsync(byte[] message)
             {
-                using (var client = new TcpClient())
+                var addresses = await Dns.GetHostAddressesAsync(_server).ConfigureAwait(false);
+                var ordered = addresses
+                    .OrderBy(x => x.AddressFamily == AddressFamily.InterNetwork ? 0 : 1)
+                    .ToArray();
+                if (ordered.Length == 0)
+                    throw new InvalidOperationException("DNS update server could not be resolved.");
+
+                var errors = new StringBuilder();
+                foreach (var address in ordered)
                 {
-                    var connect = client.ConnectAsync(_server, 53);
-                    var connected = await Task.WhenAny(connect, Task.Delay(8000)).ConfigureAwait(false);
-                    if (connected != connect)
-                        throw new TimeoutException("DNS update timed out while connecting over TCP.");
-                    await connect.ConfigureAwait(false);
-                    using (var stream = client.GetStream())
+                    try
                     {
-                        var prefix = new[] { (byte)(message.Length >> 8), (byte)message.Length };
-                        await stream.WriteAsync(prefix, 0, prefix.Length).ConfigureAwait(false);
-                        await stream.WriteAsync(message, 0, message.Length).ConfigureAwait(false);
-                        await stream.FlushAsync().ConfigureAwait(false);
-                        var lengthBytes = await ReadExactAsync(stream, 2).ConfigureAwait(false);
-                        var length = (lengthBytes[0] << 8) | lengthBytes[1];
-                        if (length < 12 || length > 65535)
-                            throw new InvalidOperationException("DNS update server returned an invalid response length.");
-                        return await ReadExactAsync(stream, length).ConfigureAwait(false);
+                        using (var client = new TcpClient(address.AddressFamily))
+                        {
+                            var connect = client.ConnectAsync(address, 53);
+                            var connected = await Task.WhenAny(connect, Task.Delay(8000)).ConfigureAwait(false);
+                            if (connected != connect)
+                                throw new TimeoutException("connection timeout");
+                            await connect.ConfigureAwait(false);
+                            using (var stream = client.GetStream())
+                            {
+                                var prefix = new[] { (byte)(message.Length >> 8), (byte)message.Length };
+                                await stream.WriteAsync(prefix, 0, prefix.Length).ConfigureAwait(false);
+                                await stream.WriteAsync(message, 0, message.Length).ConfigureAwait(false);
+                                await stream.FlushAsync().ConfigureAwait(false);
+                                var lengthBytes = await ReadExactAsync(stream, 2).ConfigureAwait(false);
+                                var length = (lengthBytes[0] << 8) | lengthBytes[1];
+                                if (length < 12 || length > 65535)
+                                    throw new InvalidOperationException("DNS update server returned an invalid response length.");
+                                return await ReadExactAsync(stream, length).ConfigureAwait(false);
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        if (errors.Length > 0)
+                            errors.Append("; ");
+                        errors.Append(address).Append(": ").Append(ex.Message);
                     }
                 }
+                throw new InvalidOperationException("DNS update TCP failed for all resolved server addresses: " + errors);
             }
 
             private static async Task<byte[]> ReadExactAsync(NetworkStream stream, int count)
@@ -542,6 +657,38 @@ namespace APTOFI.FileSharing.Network
                 throw new InvalidOperationException("DNS update failed with RCODE " + rcode + " (" + RcodeName(rcode) + ").");
             }
 
+            private static ushort ReadU16(byte[] data, int offset)
+            {
+                if (data == null || offset < 0 || offset + 2 > data.Length)
+                    throw new InvalidOperationException("DNS response is truncated.");
+                return (ushort)((data[offset] << 8) | data[offset + 1]);
+            }
+
+            private static void SkipName(byte[] data, ref int offset)
+            {
+                var guard = 0;
+                while (true)
+                {
+                    if (offset >= data.Length)
+                        throw new InvalidOperationException("DNS response contains a truncated name.");
+                    var length = data[offset++];
+                    if (length == 0)
+                        return;
+                    if ((length & 0xC0) == 0xC0)
+                    {
+                        if (offset >= data.Length)
+                            throw new InvalidOperationException("DNS response contains a truncated compression pointer.");
+                        offset++;
+                        return;
+                    }
+                    if ((length & 0xC0) != 0 || length > 63 || offset + length > data.Length)
+                        throw new InvalidOperationException("DNS response contains an invalid name.");
+                    offset += length;
+                    if (++guard > 127)
+                        throw new InvalidOperationException("DNS response contains an invalid name.");
+                }
+            }
+
             private static string RcodeName(int code)
             {
                 switch (code)
@@ -557,9 +704,9 @@ namespace APTOFI.FileSharing.Network
                 }
             }
 
-            private static void WriteUpdate(Stream stream, UpdateRecord record)
+            private static void WriteUpdate(Stream stream, UpdateRecord record, IDictionary<string, int> compression)
             {
-                WriteName(stream, record.Name);
+                WriteCompressedName(stream, record.Name, compression);
                 WriteU16(stream, record.Type);
                 WriteU16(stream, record.IsDeleteSet ? ClassAny : ClassIn);
                 WriteU32(stream, record.IsDeleteSet ? 0u : record.Ttl);
@@ -570,6 +717,42 @@ namespace APTOFI.FileSharing.Network
                 }
                 WriteU16(stream, (ushort)record.Data.Length);
                 stream.Write(record.Data, 0, record.Data.Length);
+            }
+
+            private static void WriteCompressedName(Stream stream, string name, IDictionary<string, int> compression)
+            {
+                var normalized = (name ?? string.Empty).Trim().Trim('.').ToLowerInvariant();
+                if (string.IsNullOrWhiteSpace(normalized))
+                {
+                    stream.WriteByte(0);
+                    return;
+                }
+                var labels = normalized.Split('.');
+                for (var i = 0; i < labels.Length; i++)
+                {
+                    var suffix = string.Join(".", labels, i, labels.Length - i);
+                    if (compression != null && compression.TryGetValue(suffix, out var existingOffset))
+                    {
+                        WritePointer(stream, existingOffset);
+                        return;
+                    }
+                    if (compression != null && stream.Position >= 0 && stream.Position <= 0x3FFF && !compression.ContainsKey(suffix))
+                        compression[suffix] = (int)stream.Position;
+                    var bytes = Encoding.ASCII.GetBytes(labels[i]);
+                    if (bytes.Length < 1 || bytes.Length > 63)
+                        throw new InvalidOperationException("Invalid DNS label in " + name + ".");
+                    stream.WriteByte((byte)bytes.Length);
+                    stream.Write(bytes, 0, bytes.Length);
+                }
+                stream.WriteByte(0);
+            }
+
+            private static void WritePointer(Stream stream, int offset)
+            {
+                if (offset < 0 || offset > 0x3FFF)
+                    throw new ArgumentOutOfRangeException(nameof(offset));
+                stream.WriteByte((byte)(0xC0 | ((offset >> 8) & 0x3F)));
+                stream.WriteByte((byte)(offset & 0xFF));
             }
 
             private static void WriteName(Stream stream, string name)

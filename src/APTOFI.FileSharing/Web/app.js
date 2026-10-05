@@ -1,3 +1,7 @@
+// Date: 2026-08-26
+// Time: 02:49:00 Europe/London
+// File version: 1.1.35
+// Description: Implements conflict-free navigation, direct selection, recursive folder drag-and-drop with preserved hierarchy, ZIP downloads, recycle-bin lifecycle and resilient uploads.
 (function(){
 'use strict';
 function downloadUrl(url){var a=document.createElement('a');a.href=url;a.download='';a.rel='noopener';a.style.display='none';document.body.appendChild(a);a.click();a.remove()}

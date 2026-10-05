@@ -1,3 +1,7 @@
+// Date: 2026-08-07
+// Time: 09:34:29 Europe/London
+// File version: 1.0.0
+// Description: Generates lightweight thumbnails after upload without modifying original file bytes.
 using System;
 using System.Diagnostics;
 using System.Drawing;

@@ -1,3 +1,7 @@
+// Date: 2026-08-26
+// Time: 01:49:00 Europe/London
+// File version: 1.1.25
+// Description: Defines encrypted database records including resumable uploads, recycle-bin metadata and recursive folder statistics.
 using System;
 using LiteDB;
 

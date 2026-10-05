@@ -1,3 +1,4 @@
+<!-- Date: 2026-08-25 | Time: 03:47:00 Europe/London | File version: 1.1.12 | Description: Defines the .NET Framework 4.8 WPF project, security-audited dependencies and embedded web assets. -->
 <Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" Condition="false" />
   <PropertyGroup>
@@ -61,6 +62,14 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </Page>
+    <Page Include="SetupWizardWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="DiagnosticsWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
   </ItemGroup>
   <ItemGroup>
     <Compile Include="App.xaml.cs">
@@ -70,9 +79,16 @@
     <Compile Include="MainWindow.xaml.cs">
       <DependentUpon>MainWindow.xaml</DependentUpon>
     </Compile>
+    <Compile Include="SetupWizardWindow.xaml.cs">
+      <DependentUpon>SetupWizardWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="DiagnosticsWindow.xaml.cs">
+      <DependentUpon>DiagnosticsWindow.xaml</DependentUpon>
+    </Compile>
     <Compile Include="Core\AppPaths.cs" />
     <Compile Include="Core\AppSettings.cs" />
     <Compile Include="Core\AppVersion.cs" />
+    <Compile Include="Core\ControlPanelModels.cs" />
     <Compile Include="Core\SettingsFileStore.cs" />
     <Compile Include="Core\Models.cs" />
     <Compile Include="Core\MimeTypes.cs" />
@@ -98,6 +114,7 @@
     <Compile Include="Network\WindowsNetworkService.cs" />
     <Compile Include="Network\AcmeService.cs" />
     <Compile Include="Network\DnsUpdateService.cs" />
+    <Compile Include="Network\PublicIpDetector.cs" />
     <Compile Include="Network\VpsTunnelService.cs" />
     <Compile Include="Network\ServerRuntime.cs" />
     <Compile Include="Service\AfSharingWindowsService.cs" />

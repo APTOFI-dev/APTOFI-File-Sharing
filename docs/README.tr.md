@@ -1,4 +1,4 @@
-# APTOFI File Sharing 1.1.35
+# APTOFI File Sharing 1.1.36
 
 [English](../README.md) · [Русский](README.ru.md) · [Deutsch](README.de.md) · [Українська](README.uk.md) · [Français](README.fr.md) · [Polski](README.pl.md) · **Türkçe** · [한국어](README.ko.md) · [中文](README.zh.md) · [日本語](README.ja.md)
 
@@ -73,3 +73,7 @@ Proje atfı açıkça belgelenmiştir: **APTOFI.COM — https://aptofi.com**.
 ## Lisans
 
 Kullanım, değiştirme ve dağıtım **APTOFI Attribution License 1.0** kapsamında serbesttir; **APTOFI.COM** ve **https://aptofi.com** atfı zorunludur.
+
+## Günlük döndürme ve erişim günlüğü
+
+1.1.36 sürümü yapılandırılabilir yerleşik günlük döndürme ve IP başına kompakt erişim günlüğü içerir. Varsayılanlar: 7 gün saklama, dosya başına 20 MiB, `logs` klasörü için toplam 150 MiB, her 60 dakikada döndürme kontrolü ve aynı IP için 30 dakikalık hareketsizlikten sonra özetleme. Yönetici **Logs** sekmesinden bu değerleri değiştirebilir veya her HTTP isteğini yazan tam modu açabilir. Yönetici/kullanıcı gizli yolları ve genel paylaşım belirteçleri günlük yollarında maskelenir.

@@ -1,3 +1,7 @@
+// Date: 2026-08-26
+// Time: 02:49:00 Europe/London
+// File version: 1.1.35
+// Description: Implements localized public downloads with branding, password protection and responsive folder browsing.
 (function(){
 'use strict';
 var token=document.body.dataset.token,lang=localStorage.getItem('afs_lang')||navigator.language.slice(0,2).toLowerCase(),currentFolder=null,data=null;

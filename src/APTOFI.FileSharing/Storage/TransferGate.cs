@@ -1,3 +1,7 @@
+// Date: 2026-08-07
+// Time: 10:08:26 Europe/London
+// File version: 1.0.0
+// Description: Bounds concurrent long-running transfers while keeping each transfer fully asynchronous.
 using System;
 using System.Threading;
 using System.Threading.Tasks;

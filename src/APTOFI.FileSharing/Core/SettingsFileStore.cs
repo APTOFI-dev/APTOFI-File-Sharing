@@ -1,3 +1,7 @@
+// Date: 2026-08-20
+// Time: 03:15:00 Europe/London
+// File version: 1.1.0
+// Description: Persists and verifies an encrypted durable configuration snapshot beside afsharing.exe using Windows DPAPI.
 using System;
 using System.IO;
 using System.Security.Cryptography;

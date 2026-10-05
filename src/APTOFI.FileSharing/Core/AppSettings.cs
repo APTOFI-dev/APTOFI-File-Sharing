@@ -1,3 +1,7 @@
+// Date: 2026-08-21
+// Time: 07:55:50 Europe/London
+// File version: 1.1.25
+// Description: Defines persistent server settings for storage, networking, security, custom site naming, independent branding, generic DNS, tray startup and VPS publishing.
 using System;
 using System.Collections.Generic;
 using LiteDB;
@@ -54,6 +58,12 @@ namespace APTOFI.FileSharing.Core
         public string LastDnsError { get; set; }
         public string LastCertificateError { get; set; }
         public string LastVpsError { get; set; }
+        public int LogRetentionDays { get; set; } = 7;
+        public int LogMaxFileMiB { get; set; } = 20;
+        public int LogMaxDirectoryMiB { get; set; } = 150;
+        public int LogMaintenanceIntervalMinutes { get; set; } = 60;
+        public string AccessLogMode { get; set; } = "Compact";
+        public int AccessLogAggregateMinutes { get; set; } = 30;
         public string SiteName { get; set; } = AppVersion.ProductName;
         public string BrandingLogoFileName { get; set; }
         public string BrandingFaviconFileName { get; set; }

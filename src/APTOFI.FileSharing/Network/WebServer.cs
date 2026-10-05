@@ -1,3 +1,7 @@
+// Date: 2026-10-05
+// Time: 09:50:00 +07:00
+// File version: 1.1.36
+// Description: Hosts asynchronous HTTP/HTTPS traffic while suppressing successful chunk and internal control-panel probe noise.
 using System;
 using System.Diagnostics;
 using System.IO;
@@ -194,7 +198,7 @@ namespace APTOFI.FileSharing.Network
                 try { context.Response.Close(); } catch { }
                 var status = result?.StatusCode ?? context.Response.StatusCode;
                 var bytes = result?.Bytes ?? (context.Response.ContentLength64 > 0 ? context.Response.ContentLength64 : 0);
-                if (!IsSuccessfulUploadChunk(context.Request.HttpMethod, path, status))
+                if (!IsSuccessfulUploadChunk(context.Request.HttpMethod, path, status) && !IsInternalControlNoise(ip, context.Request.HttpMethod, path, status))
                     _log.Access(ip, context.Request.HttpMethod, path, status, bytes, sw.ElapsedMilliseconds, result?.UserId);
             }
         }
@@ -202,6 +206,14 @@ namespace APTOFI.FileSharing.Network
 
 
 
+
+        private static bool IsInternalControlNoise(string ip, string method, string path, int status)
+        {
+            return (string.Equals(ip, "127.0.0.1", StringComparison.OrdinalIgnoreCase) || string.Equals(ip, "::1", StringComparison.OrdinalIgnoreCase)) &&
+                   string.Equals(method, "GET", StringComparison.OrdinalIgnoreCase) &&
+                   string.Equals(path, "/favicon.ico", StringComparison.OrdinalIgnoreCase) &&
+                   status >= 200 && status < 500;
+        }
 
         private static bool IsSuccessfulUploadChunk(string method, string path, int status)
         {

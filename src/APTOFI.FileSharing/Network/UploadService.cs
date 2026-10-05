@@ -1,3 +1,7 @@
+// Date: 2026-08-26
+// Time: 01:49:00 Europe/London
+// File version: 1.1.35
+// Description: Streams resumable uploads with idempotent start/finalization, resilient reconnect support, per-file cancellation and administrator-triggered cleanup of all unfinished uploads for a deleted user.
 using System;
 using System.IO;
 using System.Linq;

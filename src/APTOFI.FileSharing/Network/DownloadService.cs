@@ -1,3 +1,7 @@
+// Date: 2026-08-21
+// Time: 08:46:58 Europe/London
+// File version: 1.1.9
+// Description: Streams files as forced browser downloads with HTTP Range support and resume-aware counters.
 using System;
 using System.Globalization;
 using System.IO;

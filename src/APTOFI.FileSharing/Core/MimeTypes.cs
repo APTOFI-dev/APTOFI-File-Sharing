@@ -1,3 +1,7 @@
+// Date: 2026-08-07
+// Time: 09:34:29 Europe/London
+// File version: 1.0.0
+// Description: Resolves safe response MIME types from original file extensions.
 using System;
 using System.Collections.Generic;
 using System.IO;

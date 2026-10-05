@@ -1,3 +1,7 @@
+// Date: 2026-10-05
+// Time: 09:35:00 +07:00
+// File version: 1.1.36
+// Description: Runs the server with low-noise maintenance, quiet best-effort dynamic DNS synchronization and local self-recovery without external health polling.
 using System;
 using System.Threading;
 using System.Threading.Tasks;
@@ -11,6 +15,9 @@ namespace APTOFI.FileSharing.Network
 {
     internal sealed class ServerRuntime : IDisposable
     {
+        private static readonly TimeSpan BackgroundDnsInterval = TimeSpan.FromHours(1);
+        private static readonly TimeSpan BackgroundDnsRetryInterval = TimeSpan.FromMinutes(15);
+
         private readonly CryptoService _crypto;
         private readonly Database _db;
         private readonly LogService _log;
@@ -30,10 +37,10 @@ namespace APTOFI.FileSharing.Network
             AppPaths.EnsureRuntimeDirectories();
             _crypto = new CryptoService();
             _db = new Database(_crypto);
-            _log = new LogService();
             var settings = _db.GetSettings();
             if (settings == null)
                 throw new InvalidOperationException("APTOFI File Sharing has not been configured yet.");
+            _log = new LogService(settings);
             NormalizeDirectPublicUrl(settings);
             _quota = new QuotaService(_db);
             _storage = new StorageService(_db, _crypto, _quota);
@@ -83,12 +90,7 @@ namespace APTOFI.FileSharing.Network
             _vps.Start();
             _cts = new CancellationTokenSource();
             _maintenance = Task.Run(() => MaintenanceLoopAsync(_cts.Token));
-            _ = Task.Run(async () =>
-            {
-                await Task.Delay(1500).ConfigureAwait(false);
-                await SyncDnsAsync().ConfigureAwait(false);
-                await EnsureCertificateAndRestartAsync(false).ConfigureAwait(false);
-            });
+            _ = Task.Run(() => InitializeBackgroundAsync(_cts.Token));
         }
 
         public void Stop()
@@ -102,20 +104,62 @@ namespace APTOFI.FileSharing.Network
             _web.Stop();
         }
 
+        private async Task InitializeBackgroundAsync(CancellationToken token)
+        {
+            try
+            {
+                await Task.Delay(TimeSpan.FromSeconds(5), token).ConfigureAwait(false);
+            }
+            catch (TaskCanceledException)
+            {
+                return;
+            }
+
+            if (token.IsCancellationRequested)
+                return;
+
+            await EnsureCertificateAndRestartAsync(false).ConfigureAwait(false);
+            if (!token.IsCancellationRequested)
+                await SyncDnsBackgroundAsync().ConfigureAwait(false);
+        }
+
         private async Task MaintenanceLoopAsync(CancellationToken token)
         {
-            var nextTenMinutes = DateTime.UtcNow;
-            var nextHour = DateTime.UtcNow;
-            var nextCertificate = DateTime.UtcNow.AddHours(12);
+            var now = DateTime.UtcNow;
+            var nextExpiredCleanup = now.AddMinutes(30);
+            var nextHour = now.AddHours(1);
+            var nextDns = now.Add(BackgroundDnsInterval);
+            var nextCertificate = now.AddHours(12);
+
             while (!token.IsCancellationRequested)
             {
-                var now = DateTime.UtcNow;
-                if (now >= nextTenMinutes)
+                now = DateTime.UtcNow;
+
+                if (_web != null && !_web.IsRunning)
                 {
-                    nextTenMinutes = now.AddMinutes(10);
-                    try { _storage.CleanupExpired(); } catch (Exception ex) { _log.App("cleanup-expired-error " + ex.Message); }
-                    await SyncDnsAsync().ConfigureAwait(false);
+                    try
+                    {
+                        _web.Restart();
+                        _log.App("web-recovered");
+                    }
+                    catch (Exception ex)
+                    {
+                        _log.App("web-recovery-error " + ex.GetType().Name + ": " + ex.Message);
+                    }
                 }
+
+                if (now >= nextExpiredCleanup)
+                {
+                    nextExpiredCleanup = now.AddMinutes(30);
+                    try { _storage.CleanupExpired(); } catch (Exception ex) { _log.App("cleanup-expired-error " + ex.Message); }
+                }
+
+                if (now >= nextDns)
+                {
+                    var dnsOk = await SyncDnsBackgroundAsync().ConfigureAwait(false);
+                    nextDns = now.Add(dnsOk ? BackgroundDnsInterval : BackgroundDnsRetryInterval);
+                }
+
                 if (now >= nextHour)
                 {
                     nextHour = now.AddHours(1);
@@ -130,29 +174,36 @@ namespace APTOFI.FileSharing.Network
                     try { _sessions.Cleanup(); } catch (Exception ex) { _log.App("cleanup-session-error " + ex.Message); }
                     try { _downloads.CleanupTickets(); } catch (Exception ex) { _log.App("cleanup-download-ticket-error " + ex.Message); }
                 }
+
                 if (now >= nextCertificate)
                 {
                     nextCertificate = now.AddHours(12);
                     await EnsureCertificateAndRestartAsync(false).ConfigureAwait(false);
                 }
-                try { await Task.Delay(TimeSpan.FromMinutes(1), token).ConfigureAwait(false); } catch (TaskCanceledException) { }
+
+                try
+                {
+                    await Task.Delay(TimeSpan.FromMinutes(1), token).ConfigureAwait(false);
+                }
+                catch (TaskCanceledException)
+                {
+                }
             }
         }
 
-        private async Task SyncDnsAsync()
+        private async Task<bool> SyncDnsBackgroundAsync()
         {
             try
             {
                 var settings = _db.GetSettings();
-                if (!DnsUpdateService.IsConfigured(settings))
-                    return;
-                var result = await _acme.SyncPublicDnsAsync().ConfigureAwait(false);
-                if (!result.Success)
-                    _log.App("dns-maintenance-error " + result.Error);
+                if (!DnsUpdateService.IsConfigured(settings) || !settings.DnsAutoUpdateAddress)
+                    return true;
+                var result = await _acme.SyncPublicDnsAsync(true).ConfigureAwait(false);
+                return result.Success;
             }
-            catch (Exception ex)
+            catch
             {
-                _log.App("dns-maintenance-error " + ex);
+                return false;
             }
         }
 
@@ -169,7 +220,7 @@ namespace APTOFI.FileSharing.Network
             }
             catch (Exception ex)
             {
-                _log.App("certificate-maintenance-error " + ex);
+                _log.App("certificate-maintenance-error " + ex.GetType().Name + ": " + ex.Message);
             }
         }
 

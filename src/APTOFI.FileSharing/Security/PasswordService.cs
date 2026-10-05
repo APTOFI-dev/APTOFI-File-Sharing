@@ -1,3 +1,7 @@
+// Date: 2026-08-07
+// Time: 09:34:29 Europe/London
+// File version: 1.0.0
+// Description: Hashes and verifies account and share passwords with Argon2.
 using Isopoh.Cryptography.Argon2;
 
 namespace APTOFI.FileSharing.Security

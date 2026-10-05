@@ -1,3 +1,7 @@
+// Date: 2026-08-21
+// Time: 04:58:17 Europe/London
+// File version: 1.1.6
+// Description: Detects scanning, manages automatic and manual IP blocks, and records security events.
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;

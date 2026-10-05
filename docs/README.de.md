@@ -1,4 +1,4 @@
-# APTOFI File Sharing 1.1.35
+# APTOFI File Sharing 1.1.36
 
 [English](../README.md) · [Русский](README.ru.md) · **Deutsch** · [Українська](README.uk.md) · [Français](README.fr.md) · [Polski](README.pl.md) · [Türkçe](README.tr.md) · [한국어](README.ko.md) · [中文](README.zh.md) · [日本語](README.ja.md)
 
@@ -85,3 +85,7 @@ Die Projektattribution ist ausdrücklich dokumentiert: **APTOFI.COM — https://
 ## Lizenz
 
 Nutzung, Änderung und Weitergabe sind unter der **APTOFI Attribution License 1.0** erlaubt. Die Nennung von **APTOFI.COM** mit **https://aptofi.com** ist verpflichtend.
+
+## Logrotation und Zugriffsprotokoll
+
+Version 1.1.36 enthält eine integrierte, konfigurierbare Logrotation und einen kompakten Zugriffsmodus pro IP. Standardwerte: 7 Tage Aufbewahrung, 20 MiB pro Datei, 150 MiB für den gesamten `logs`-Ordner, Rotationsprüfung alle 60 Minuten und Zusammenfassung einer IP nach 30 Minuten Inaktivität. Auf der Registerkarte **Logs** können Administratoren diese Werte ändern oder die vollständige Protokollierung jeder HTTP-Anfrage aktivieren. Geheime Admin-/Benutzerpfade und öffentliche Freigabetoken werden in Logpfaden maskiert.

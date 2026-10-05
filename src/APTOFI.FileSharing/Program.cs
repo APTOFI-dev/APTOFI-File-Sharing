@@ -1,3 +1,7 @@
+// Date: 2026-08-20
+// Time: 02:45:00 Europe/London
+// File version: 1.1.0
+// Description: Selects elevated interactive, tray, Windows service and service-management execution modes.
 using System;
 using System.Diagnostics;
 using System.IO;

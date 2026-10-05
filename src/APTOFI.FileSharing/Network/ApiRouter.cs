@@ -1,3 +1,7 @@
+// Date: 2026-08-26
+// Time: 01:49:00 Europe/London
+// File version: 1.1.34
+// Description: Routes authenticated API requests including ZIP64 folder downloads, selected-item archives, recycle-bin lifecycle and resilient uploads.
 using System;
 using System.Collections.Generic;
 using System.Globalization;

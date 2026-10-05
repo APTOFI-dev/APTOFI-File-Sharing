@@ -1,3 +1,7 @@
+// Date: 2026-08-07
+// Time: 10:56:33 Europe/London
+// File version: 1.0.2
+// Description: Configures an Ubuntu or Debian VPS and maintains a reconnecting reverse SSH tunnel to the Windows server.
 using System;
 using System.IO;
 using System.Net;

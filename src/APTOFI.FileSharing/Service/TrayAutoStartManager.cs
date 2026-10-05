@@ -1,3 +1,7 @@
+// Date: 2026-08-20
+// Time: 02:45:00 Europe/London
+// File version: 1.1.0
+// Description: Manages elevated APTOFI tray startup at Windows sign-in through Task Scheduler.
 using System;
 using System.Diagnostics;
 using APTOFI.FileSharing.Core;

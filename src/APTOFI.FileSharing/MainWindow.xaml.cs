@@ -1,11 +1,22 @@
+// Date: 2026-10-05
+// Time: 09:45:00 +07:00
+// File version: 1.1.36
+// Description: Controls the tray UI with quiet lightweight runtime status, explicit deep diagnostics and non-fatal clipboard actions.
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Net;
 using System.Net.Http;
+using System.Net.NetworkInformation;
+using System.Net.Security;
+using System.Net.Sockets;
 using System.Security.Cryptography;
+using System.Security.Authentication;
+using System.Security.Cryptography.X509Certificates;
 using System.ServiceProcess;
 using System.Threading.Tasks;
 using System.Windows;
@@ -30,6 +41,7 @@ namespace APTOFI.FileSharing
         private readonly APTOFI.FileSharing.Service.ServiceInstaller _serviceInstaller = new APTOFI.FileSharing.Service.ServiceInstaller();
         private readonly TrayAutoStartManager _trayAutoStartManager = new TrayAutoStartManager();
         private readonly DispatcherTimer _statusTimer = new DispatcherTimer();
+        private readonly DispatcherTimer _healthTimer = new DispatcherTimer();
         private readonly DispatcherTimer _logRefreshTimer = new DispatcherTimer();
         private readonly List<StorageLocationSetting> _storageLocations = new List<StorageLocationSetting>();
         private FileSystemWatcher _logWatcher;
@@ -45,6 +57,10 @@ namespace APTOFI.FileSharing
         private string _siteName = AppVersion.ProductName;
         private bool _allowClose;
         private int _selectedStorageIndex = -1;
+        private bool _healthBusy;
+        private ControlHealthLevel _lastHealthLevel = ControlHealthLevel.Unknown;
+        private bool _wizardAutoShown;
+        private string _logFilter = "all";
 
         public bool IsConfigured => _configured;
 
@@ -58,6 +74,8 @@ namespace APTOFI.FileSharing
             ModeBox.SelectedIndex = 0;
             DnsModeBox.SelectedIndex = 0;
             DnsAlgorithmBox.SelectedIndex = 0;
+            LogFilterBox.SelectedIndex = 0;
+            AccessLogModeBox.SelectedIndex = 0;
             GenerateAdminButton_OnClick(null, null);
             LoadExisting();
             if (_storageLocations.Count == 0)
@@ -69,10 +87,22 @@ namespace APTOFI.FileSharing
             EnsureConfiguredTrayAutoStart();
             ApplyLanguage();
             RefreshRuntimeSummary();
-            _statusTimer.Interval = TimeSpan.FromSeconds(2);
+            _statusTimer.Interval = TimeSpan.FromSeconds(10);
             _statusTimer.Tick += (sender, args) => RefreshRuntimeSummary();
             _statusTimer.Start();
+            _healthTimer.Interval = TimeSpan.FromMinutes(1);
+            _healthTimer.Tick += async (sender, args) => await RefreshHealthAsync();
+            _healthTimer.Start();
             InitializeLiveLogs();
+            Loaded += async (sender, args) =>
+            {
+                await RefreshHealthAsync();
+                if (!_configured && !_wizardAutoShown)
+                {
+                    _wizardAutoShown = true;
+                    Dispatcher.BeginInvoke(new Action(() => OpenSetupWizard(true)));
+                }
+            };
             if (!AppPaths.IsBaseDirectoryWritable(out var error))
             {
                 MessageText.Foreground = Brushes.Firebrick;
@@ -126,6 +156,12 @@ namespace APTOFI.FileSharing
                     AcmeEmailBox.Text = s.AcmeEmail ?? string.Empty;
                     AcmeTermsBox.IsChecked = s.AcmeTermsAccepted;
                     TrayAutoStartBox.IsChecked = s.TrayAutoStartEnabled;
+                    LogRetentionDaysBox.Text = NormalizeLogValue(s.LogRetentionDays, 7).ToString(CultureInfo.InvariantCulture);
+                    LogMaxFileBox.Text = NormalizeLogValue(s.LogMaxFileMiB, 20).ToString(CultureInfo.InvariantCulture);
+                    LogMaxDirectoryBox.Text = NormalizeLogValue(s.LogMaxDirectoryMiB, 150).ToString(CultureInfo.InvariantCulture);
+                    LogMaintenanceIntervalBox.Text = NormalizeLogValue(s.LogMaintenanceIntervalMinutes, 60).ToString(CultureInfo.InvariantCulture);
+                    AccessAggregateMinutesBox.Text = NormalizeLogValue(s.AccessLogAggregateMinutes, 30).ToString(CultureInfo.InvariantCulture);
+                    SelectAccessLogMode(s.AccessLogMode);
                     var admin = db.Users.FindOne(x => x.Role == "admin");
                     if (admin != null)
                     {
@@ -147,8 +183,7 @@ namespace APTOFI.FileSharing
             DetectButton.IsEnabled = false;
             try
             {
-                using (var client = new HttpClient { Timeout = TimeSpan.FromSeconds(8) })
-                    PublicBox.Text = (await client.GetStringAsync("https://api.ipify.org")).Trim();
+                PublicBox.Text = await PublicIpDetector.DetectIpv4TextAsync(TimeSpan.FromSeconds(8));
             }
             catch (Exception ex)
             {
@@ -413,6 +448,12 @@ namespace APTOFI.FileSharing
                 Password = PasswordBox.Password,
                 RepeatPassword = RepeatPasswordBox.Password,
                 TrayAutoStart = TrayAutoStartBox.IsChecked == true,
+                LogRetentionDaysText = LogRetentionDaysBox.Text.Trim(),
+                LogMaxFileMiBText = LogMaxFileBox.Text.Trim(),
+                LogMaxDirectoryMiBText = LogMaxDirectoryBox.Text.Trim(),
+                LogMaintenanceIntervalMinutesText = LogMaintenanceIntervalBox.Text.Trim(),
+                AccessLogMode = AccessLogModeBox.SelectedItem is ComboBoxItem accessModeItem ? Convert.ToString(accessModeItem.Tag) : "Compact",
+                AccessLogAggregateMinutesText = AccessAggregateMinutesBox.Text.Trim(),
                 Language = _language
             };
         }
@@ -427,6 +468,18 @@ namespace APTOFI.FileSharing
                 throw new InvalidOperationException("Invalid VPS SSH port.");
             if (!long.TryParse(input.ServerQuotaText, out var serverQuota) || serverQuota < 0)
                 throw new InvalidOperationException("Invalid server quota.");
+            if (!int.TryParse(input.LogRetentionDaysText, out var logRetentionDays) || logRetentionDays < 1 || logRetentionDays > 3650)
+                throw new InvalidOperationException("Log retention must be between 1 and 3650 days.");
+            if (!int.TryParse(input.LogMaxFileMiBText, out var logMaxFileMiB) || logMaxFileMiB < 1 || logMaxFileMiB > 1024)
+                throw new InvalidOperationException("Maximum log file size must be between 1 and 1024 MiB.");
+            if (!int.TryParse(input.LogMaxDirectoryMiBText, out var logMaxDirectoryMiB) || logMaxDirectoryMiB < 10 || logMaxDirectoryMiB > 102400)
+                throw new InvalidOperationException("Maximum log folder size must be between 10 and 102400 MiB.");
+            if (!int.TryParse(input.LogMaintenanceIntervalMinutesText, out var logMaintenanceIntervalMinutes) || logMaintenanceIntervalMinutes < 5 || logMaintenanceIntervalMinutes > 1440)
+                throw new InvalidOperationException("Log maintenance interval must be between 5 and 1440 minutes.");
+            if (!int.TryParse(input.AccessLogAggregateMinutesText, out var accessLogAggregateMinutes) || accessLogAggregateMinutes < 1 || accessLogAggregateMinutes > 1440)
+                throw new InvalidOperationException("Access aggregation interval must be between 1 and 1440 minutes.");
+            if (!string.Equals(input.AccessLogMode, "Compact", StringComparison.OrdinalIgnoreCase) && !string.Equals(input.AccessLogMode, "Full", StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("Invalid access log mode.");
             foreach (var location in input.StorageLocations)
             {
                 location.Path = Path.GetFullPath(location.Path.Trim());
@@ -471,6 +524,12 @@ namespace APTOFI.FileSharing
                 settings.UserPath = userPath;
                 settings.Language = input.Language;
                 settings.TrayAutoStartEnabled = input.TrayAutoStart;
+                settings.LogRetentionDays = logRetentionDays;
+                settings.LogMaxFileMiB = logMaxFileMiB;
+                settings.LogMaxDirectoryMiB = logMaxDirectoryMiB;
+                settings.LogMaintenanceIntervalMinutes = logMaintenanceIntervalMinutes;
+                settings.AccessLogMode = string.Equals(input.AccessLogMode, "Full", StringComparison.OrdinalIgnoreCase) ? "Full" : "Compact";
+                settings.AccessLogAggregateMinutes = accessLogAggregateMinutes;
                 settings.AcmeTermsAccepted = input.AcmeTerms;
                 settings.EnableHttps = input.Mode != "Local";
                 settings.AcmeEmail = string.IsNullOrWhiteSpace(input.AcmeEmail) ? input.Email : input.AcmeEmail;
@@ -626,8 +685,14 @@ namespace APTOFI.FileSharing
             value = (value ?? string.Empty).Trim();
             if (value.Length == 0 || value == "—")
                 return;
-            Clipboard.SetText(value);
-            ShowSuccess(UiText.Get(_language, "publicCopied"));
+            try
+            {
+                Clipboard.SetText(value);
+                ShowSuccess(UiText.Get(_language, "publicCopied"));
+            }
+            catch
+            {
+            }
         }
 
         private void ModeBox_OnSelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -691,7 +756,9 @@ namespace APTOFI.FileSharing
             var result = status == ServiceControllerStatus.Running ? _serviceInstaller.StopElevated() : _serviceInstaller.StartElevated();
             if (!result.Success)
                 ShowError(result.Output);
+            _lastHealthLevel = ControlHealthLevel.Unknown;
             RefreshRuntimeSummary();
+            _ = RefreshHealthAsync();
         }
 
         private void MinimizeTrayButton_OnClick(object sender, RoutedEventArgs e)
@@ -704,13 +771,17 @@ namespace APTOFI.FileSharing
             var status = _serviceInstaller.Status();
             var running = status == ServiceControllerStatus.Running;
             var pending = status == ServiceControllerStatus.StartPending;
-            HeaderStatusDot.Fill = running ? Brushes.SeaGreen : pending ? Brushes.DarkOrange : Brushes.Firebrick;
-            OverviewStateDot.Fill = HeaderStatusDot.Fill;
             var stateKey = running ? "serviceRunning" : pending ? "serviceStarting" : "serviceStopped";
-            StatusText.Text = UiText.Get(_language, "service") + ": " + UiText.Get(_language, stateKey);
-            OverviewStateText.Text = UiText.Get(_language, stateKey);
+            if (_lastHealthLevel == ControlHealthLevel.Unknown)
+            {
+                HeaderStatusDot.Fill = running ? Brushes.SeaGreen : pending ? Brushes.DarkOrange : Brushes.Firebrick;
+                OverviewStateDot.Fill = HeaderStatusDot.Fill;
+                StatusText.Text = UiText.Get(_language, "service") + ": " + UiText.Get(_language, stateKey);
+                OverviewStateText.Text = UiText.Get(_language, stateKey);
+            }
             ServiceToggleButton.Content = UiText.Get(_language, running ? "stop" : "start");
             ServiceToggleButton.IsEnabled = !pending && _serviceInstaller.IsInstalled();
+            RestartServiceButton.IsEnabled = running && !pending;
             OpenAdminButton.IsEnabled = _configured && running;
             OpenUserButton.IsEnabled = _configured && running;
             MinimizeTrayButton.IsEnabled = _configured;
@@ -807,10 +878,8 @@ namespace APTOFI.FileSharing
                 if (!string.IsNullOrEmpty(text))
                     Clipboard.SetText(text);
             }
-            catch (Exception ex)
+            catch
             {
-                MessageText.Foreground = Brushes.Firebrick;
-                MessageText.Text = ex.Message;
             }
         }
 
@@ -858,18 +927,202 @@ namespace APTOFI.FileSharing
             {
                 AppPaths.EnsureRuntimeDirectories();
                 var files = Directory.GetFiles(AppPaths.LogsDirectory, "*.log").Select(x => new FileInfo(x)).OrderByDescending(x => x.LastWriteTimeUtc).Take(5).OrderBy(x => x.LastWriteTimeUtc).ToList();
-                var text = new List<string>();
+                var raw = new List<string>();
                 foreach (var file in files)
                 {
-                    text.Add("===== " + file.Name + " =====");
-                    text.AddRange(ReadLastLines(file.FullName, 160));
+                    var lines = ReadLastLines(file.FullName, 240).ToList();
+                    if (file.Name.StartsWith("crash-", StringComparison.OrdinalIgnoreCase))
+                        lines = RemoveClipboardCrashNoise(lines).ToList();
+                    if (lines.Count == 0)
+                        continue;
+                    raw.Add("===== " + file.Name + " =====");
+                    raw.AddRange(lines);
                 }
-                LogTextBox.Text = string.Join(Environment.NewLine, text);
-                LogTextBox.ScrollToEnd();
+
+                var rendered = AggregateLogLines(raw.Where(line => !IsDisplayNoise(line))).Where(LogLineMatchesFilter).ToList();
+                LogListBox.Items.Clear();
+                foreach (var line in rendered)
+                {
+                    var block = new TextBlock
+                    {
+                        Text = line,
+                        TextWrapping = TextWrapping.Wrap,
+                        Margin = new Thickness(6, 2, 6, 2),
+                        Foreground = LogBrush(line)
+                    };
+                    LogListBox.Items.Add(block);
+                }
+                LogTextBox.Text = string.Join(Environment.NewLine, rendered);
+                if (LogListBox.Items.Count > 0)
+                    LogListBox.ScrollIntoView(LogListBox.Items[LogListBox.Items.Count - 1]);
             }
             catch (Exception ex)
             {
+                LogListBox.Items.Clear();
+                LogListBox.Items.Add(new TextBlock { Text = ex.Message, Foreground = Brushes.Firebrick, TextWrapping = TextWrapping.Wrap });
                 LogTextBox.Text = ex.Message;
+            }
+        }
+
+        private IEnumerable<string> AggregateLogLines(IEnumerable<string> lines)
+        {
+            string lastKey = null;
+            string lastLine = null;
+            var count = 0;
+            foreach (var line in lines)
+            {
+                if (line.StartsWith("===== ", StringComparison.Ordinal))
+                {
+                    if (count > 0)
+                        yield return count > 1 ? lastLine + "  ×" + count : lastLine;
+                    lastKey = null;
+                    lastLine = null;
+                    count = 0;
+                    yield return line;
+                    continue;
+                }
+                var key = NormalizeLogKey(line);
+                if (lastKey != null && string.Equals(lastKey, key, StringComparison.Ordinal))
+                {
+                    count++;
+                    lastLine = line;
+                    continue;
+                }
+                if (count > 0)
+                    yield return count > 1 ? lastLine + "  ×" + count : lastLine;
+                lastKey = key;
+                lastLine = line;
+                count = 1;
+            }
+            if (count > 0)
+                yield return count > 1 ? lastLine + "  ×" + count : lastLine;
+        }
+
+        private static IEnumerable<string> RemoveClipboardCrashNoise(IList<string> lines)
+        {
+            if (lines == null || lines.Count == 0)
+                yield break;
+
+            var block = new List<string>();
+            foreach (var line in lines)
+            {
+                if (IsCrashEntryStart(line) && block.Count > 0)
+                {
+                    if (!block.Any(IsClipboardCrashLine))
+                    {
+                        foreach (var item in block)
+                            yield return item;
+                    }
+                    block.Clear();
+                }
+                block.Add(line);
+            }
+
+            if (block.Count > 0 && !block.Any(IsClipboardCrashLine))
+            {
+                foreach (var item in block)
+                    yield return item;
+            }
+        }
+
+        private static bool IsCrashEntryStart(string line)
+        {
+            return !string.IsNullOrWhiteSpace(line) && line.Length > 20 &&
+                   char.IsDigit(line[0]) && line[4] == '-' && line[7] == '-' && line[10] == 'T';
+        }
+
+        private static bool IsClipboardCrashLine(string line)
+        {
+            var text = line ?? string.Empty;
+            return text.IndexOf("CLIPBRD_E_CANT_OPEN", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                   text.IndexOf("OpenClipboard", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                   text.IndexOf("System.Windows.Clipboard", StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        private static bool IsDisplayNoise(string line)
+        {
+            if (string.IsNullOrWhiteSpace(line) || line.StartsWith("===== ", StringComparison.Ordinal))
+                return false;
+            var text = line.Trim();
+            if ((text.IndexOf("dns-maintenance-error", StringComparison.OrdinalIgnoreCase) >= 0 || text.IndexOf("dns-address-error", StringComparison.OrdinalIgnoreCase) >= 0) &&
+                (text.IndexOf("TaskCanceledException", StringComparison.OrdinalIgnoreCase) >= 0 || text.IndexOf("Отменена задача", StringComparison.OrdinalIgnoreCase) >= 0))
+                return true;
+            if ((text.IndexOf("ip=127.0.0.1", StringComparison.OrdinalIgnoreCase) >= 0 || text.IndexOf("ip=::1", StringComparison.OrdinalIgnoreCase) >= 0) &&
+                text.IndexOf("method=GET", StringComparison.OrdinalIgnoreCase) >= 0 &&
+                text.IndexOf("path=/favicon.ico", StringComparison.OrdinalIgnoreCase) >= 0)
+                return true;
+            return false;
+        }
+
+        private static string NormalizeLogKey(string line)
+        {
+            if (string.IsNullOrWhiteSpace(line))
+                return string.Empty;
+            var text = line.Trim();
+            if (text.Length > 24 && char.IsDigit(text[0]) && text[4] == '-' && text[7] == '-')
+            {
+                var firstSpace = text.IndexOf(' ');
+                if (firstSpace >= 0)
+                {
+                    var secondSpace = text.IndexOf(' ', firstSpace + 1);
+                    if (secondSpace >= 0 && secondSpace + 1 < text.Length)
+                        text = text.Substring(secondSpace + 1);
+                }
+            }
+            if (text.StartsWith("dns-address-error ", StringComparison.OrdinalIgnoreCase))
+                return "dns-address-error " + CollapseDnsError(text);
+            if (text.StartsWith("dns-maintenance-error ", StringComparison.OrdinalIgnoreCase))
+                return "dns-maintenance-error " + CollapseDnsError(text);
+            return text;
+        }
+
+        private static string CollapseDnsError(string text)
+        {
+            if (text.IndexOf("timed out", StringComparison.OrdinalIgnoreCase) >= 0)
+                return "timeout";
+            if (text.IndexOf("RCODE 5", StringComparison.OrdinalIgnoreCase) >= 0)
+                return "rcode5";
+            return text;
+        }
+
+        private bool LogLineMatchesFilter(string line)
+        {
+            if (line.StartsWith("===== ", StringComparison.Ordinal))
+                return true;
+            var level = LogLevel(line);
+            switch (_logFilter)
+            {
+                case "error": return level == "error";
+                case "warn": return level == "warn";
+                case "info": return level == "info";
+                default: return true;
+            }
+        }
+
+        private static string LogLevel(string line)
+        {
+            var text = line ?? string.Empty;
+            if (text.IndexOf("CRITICAL", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                text.IndexOf("ERROR", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                text.IndexOf("-error", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                text.IndexOf(" error ", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                text.IndexOf("failed", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                text.IndexOf("exception", StringComparison.OrdinalIgnoreCase) >= 0)
+                return "error";
+            if (text.IndexOf("WARN", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                text.IndexOf("warning", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                text.IndexOf("retry", StringComparison.OrdinalIgnoreCase) >= 0)
+                return "warn";
+            return "info";
+        }
+
+        private static Brush LogBrush(string line)
+        {
+            switch (LogLevel(line))
+            {
+                case "error": return Brushes.Firebrick;
+                case "warn": return Brushes.DarkOrange;
+                default: return Brushes.Black;
             }
         }
 
@@ -913,7 +1166,7 @@ namespace APTOFI.FileSharing
             OverviewTab.Header = UiText.Get(_language, "overview");
             StorageTab.Header = UiText.Get(_language, "storageTab");
             NetworkTab.Header = UiText.Get(_language, "networkTab");
-            DomainTab.Header = UiText.Get(_language, "domainTab");
+            DomainTab.Header = UiText.Get(_language, "domainHttpsTab");
             AccountTab.Header = UiText.Get(_language, "accountTab");
             LogsTab.Header = UiText.Get(_language, "logsTab");
             OverviewStateLabel.Text = UiText.Get(_language, "serverState");
@@ -957,6 +1210,7 @@ namespace APTOFI.FileSharing
             DnsAlgorithmLabel.Text = UiText.Get(_language, "dnsAlgorithm");
             DnsSecretLabel.Text = UiText.Get(_language, "dnsSecret");
             DnsAutoAddressBox.Content = UiText.Get(_language, "dnsAutoAddress");
+            TestDnsButton.Content = UiText.Get(_language, "testDns");
             ConfigureHttpsButton.Content = UiText.Get(_language, "issueHttps");
             CopyPublicButton.Content = UiText.Get(_language, "copy");
             CopyUserLoginButton.Content = UiText.Get(_language, "copy");
@@ -967,8 +1221,35 @@ namespace APTOFI.FileSharing
             RepeatLabel.Text = UiText.Get(_language, "repeat");
             InstallServiceBox.Content = UiText.Get(_language, "installService");
             TrayAutoStartBox.Content = UiText.Get(_language, "trayAutostart");
+            LogFilterLabel.Text = UiText.Get(_language, "logFilter");
+            ((ComboBoxItem)LogFilterBox.Items[0]).Content = UiText.Get(_language, "logAll");
+            ((ComboBoxItem)LogFilterBox.Items[1]).Content = UiText.Get(_language, "logErrors");
+            ((ComboBoxItem)LogFilterBox.Items[2]).Content = UiText.Get(_language, "logWarnings");
+            ((ComboBoxItem)LogFilterBox.Items[3]).Content = UiText.Get(_language, "logInfo");
+            RefreshLogsButton.Content = UiText.Get(_language, "refreshLogs");
             CopyLogButton.Content = UiText.Get(_language, "copyLog");
             OpenLogsButton.Content = UiText.Get(_language, "openLogs");
+            ClearLogDisplayButton.Content = UiText.Get(_language, "clearLogDisplay");
+            LogSettingsExpander.Header = UiText.Get(_language, "logSettings");
+            LogSettingsHintText.Text = UiText.Get(_language, "logSettingsHint");
+            LogRetentionDaysLabel.Text = UiText.Get(_language, "logRetentionDays");
+            LogMaxFileLabel.Text = UiText.Get(_language, "logMaxFileMiB");
+            LogMaxDirectoryLabel.Text = UiText.Get(_language, "logMaxDirectoryMiB");
+            LogMaintenanceIntervalLabel.Text = UiText.Get(_language, "logMaintenanceInterval");
+            AccessLogModeLabel.Text = UiText.Get(_language, "accessLogMode");
+            ((ComboBoxItem)AccessLogModeBox.Items[0]).Content = UiText.Get(_language, "accessLogCompact");
+            ((ComboBoxItem)AccessLogModeBox.Items[1]).Content = UiText.Get(_language, "accessLogFull");
+            AccessAggregateMinutesLabel.Text = UiText.Get(_language, "accessAggregateMinutes");
+            WizardButton.Content = UiText.Get(_language, "setupWizard");
+            DiagnosticsButton.Content = UiText.Get(_language, "diagnostics");
+            RestartServiceButton.Content = UiText.Get(_language, "restart");
+            HealthServiceLabel.Text = UiText.Get(_language, "healthService");
+            HealthHttpLabel.Text = UiText.Get(_language, "healthHttp");
+            HealthHttpsLabel.Text = UiText.Get(_language, "healthHttps");
+            HealthDnsLabel.Text = UiText.Get(_language, "healthDns");
+            HealthCertificateLabel.Text = UiText.Get(_language, "healthCertificate");
+            HealthStorageLabel.Text = UiText.Get(_language, "healthStorage");
+            HealthExternalLabel.Text = UiText.Get(_language, "healthExternal");
             SaveButton.Content = UiText.Get(_language, "save");
             ApplyButton.Content = UiText.Get(_language, "saveStart");
             MinimizeTrayButton.Content = UiText.Get(_language, "minimizeTray");
@@ -1021,6 +1302,7 @@ namespace APTOFI.FileSharing
         private void MainWindow_OnClosed(object sender, EventArgs e)
         {
             _statusTimer.Stop();
+            _healthTimer.Stop();
             _logRefreshTimer.Stop();
             if (_logWatcher != null)
             {
@@ -1163,6 +1445,26 @@ namespace APTOFI.FileSharing
             DnsAlgorithmBox.SelectedIndex = 0;
         }
 
+        private void SelectAccessLogMode(string value)
+        {
+            var target = string.Equals(value, "Full", StringComparison.OrdinalIgnoreCase) ? "Full" : "Compact";
+            for (var i = 0; i < AccessLogModeBox.Items.Count; i++)
+            {
+                var item = AccessLogModeBox.Items[i] as ComboBoxItem;
+                if (item != null && string.Equals(Convert.ToString(item.Tag), target, StringComparison.OrdinalIgnoreCase))
+                {
+                    AccessLogModeBox.SelectedIndex = i;
+                    return;
+                }
+            }
+            AccessLogModeBox.SelectedIndex = 0;
+        }
+
+        private static int NormalizeLogValue(int value, int fallback)
+        {
+            return value > 0 ? value : fallback;
+        }
+
         private static string BuildCanonicalPublicBaseUrl(AppSettings settings)
         {
             if (settings == null)
@@ -1229,6 +1531,576 @@ namespace APTOFI.FileSharing
             return n.ToString(index == 0 ? "0" : "0.##") + " " + units[index];
         }
 
+        private void WizardButton_OnClick(object sender, RoutedEventArgs e)
+        {
+            OpenSetupWizard(false);
+        }
+
+        private void OpenSetupWizard(bool firstRun)
+        {
+            try
+            {
+                var wizard = new SetupWizardWindow(this, firstRun);
+                wizard.ShowDialog();
+                RefreshRuntimeSummary();
+                _ = RefreshHealthAsync();
+            }
+            catch (Exception ex)
+            {
+                ShowError(ex.Message);
+            }
+        }
+
+        private void DiagnosticsButton_OnClick(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                new DiagnosticsWindow(this).ShowDialog();
+            }
+            catch (Exception ex)
+            {
+                ShowError(ex.Message);
+            }
+        }
+
+        private void RestartServiceButton_OnClick(object sender, RoutedEventArgs e)
+        {
+            var result = _serviceInstaller.RestartInternal();
+            if (!result.Success)
+                ShowError(result.Output);
+            else
+                ShowSuccess(UiText.Get(_language, "serviceRestarted"));
+            _lastHealthLevel = ControlHealthLevel.Unknown;
+            RefreshRuntimeSummary();
+            _ = RefreshHealthAsync();
+        }
+
+        private async void TestDnsButton_OnClick(object sender, RoutedEventArgs e)
+        {
+            TestDnsButton.IsEnabled = false;
+            SaveButton.IsEnabled = false;
+            ApplyButton.IsEnabled = false;
+            try
+            {
+                ShowSuccess(UiText.Get(_language, "dnsTesting"));
+                await SaveConfigurationAsync();
+                var crypto = new CryptoService();
+                using (var db = new Database(crypto))
+                using (var log = new LogService())
+                {
+                    var service = new DnsUpdateService(db, crypto, log);
+                    var result = await service.TestAsync(db.GetSettings());
+                    if (!result.Success)
+                        throw new InvalidOperationException(result.Error);
+                    ShowSuccess(UiText.Get(_language, "dnsTestOk") + " " + result.Domain + " → " + result.Details);
+                }
+            }
+            catch (Exception ex)
+            {
+                ShowError(ex.Message);
+            }
+            finally
+            {
+                TestDnsButton.IsEnabled = true;
+                SaveButton.IsEnabled = true;
+                ApplyButton.IsEnabled = true;
+                await RefreshHealthAsync();
+            }
+        }
+
+        private void LogFilterBox_OnSelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (LogFilterBox == null || LogFilterBox.SelectedItem == null)
+                return;
+            var item = LogFilterBox.SelectedItem as ComboBoxItem;
+            _logFilter = item == null ? "all" : Convert.ToString(item.Tag) ?? "all";
+            if (IsInitialized)
+                RefreshLogs();
+        }
+
+        private void RefreshLogsButton_OnClick(object sender, RoutedEventArgs e)
+        {
+            RefreshLogs();
+        }
+
+        private void ClearLogDisplayButton_OnClick(object sender, RoutedEventArgs e)
+        {
+            LogListBox.Items.Clear();
+            LogTextBox.Text = string.Empty;
+        }
+
+        internal SetupWizardData GetWizardData()
+        {
+            var primary = _storageLocations.FirstOrDefault();
+            return new SetupWizardData
+            {
+                StoragePath = primary?.Path ?? string.Empty,
+                Mode = ModeBox.SelectedItem is ComboBoxItem modeItem ? Convert.ToString(modeItem.Tag) : "Direct",
+                Bind = BindBox.Text,
+                PublicIp = PublicBox.Text,
+                HttpPort = HttpPortBox.Text,
+                HttpsPort = HttpsPortBox.Text,
+                AdminPath = AdminPathBox.Text,
+                UserPath = UserPathBox.Text,
+                VpsHost = VpsHostBox.Text,
+                VpsPort = VpsPortBox.Text,
+                VpsUser = VpsUserBox.Text,
+                VpsUseSudo = VpsSudoBox.IsChecked == true,
+                Domain = DomainBox.Text,
+                DnsMode = DnsModeBox.SelectedItem is ComboBoxItem dnsItem ? Convert.ToString(dnsItem.Tag) : "Manual",
+                DnsServer = DnsServerBox.Text,
+                DnsZone = DnsZoneBox.Text,
+                DnsKeyName = DnsKeyNameBox.Text,
+                DnsAlgorithm = DnsAlgorithmBox.SelectedItem is ComboBoxItem algorithmItem ? Convert.ToString(algorithmItem.Tag) : "hmac-sha256",
+                DnsAutoAddress = DnsAutoAddressBox.IsChecked == true,
+                AcmeEmail = AcmeEmailBox.Text,
+                AcmeTerms = AcmeTermsBox.IsChecked == true,
+                Email = EmailBox.Text,
+                TrayAutoStart = TrayAutoStartBox.IsChecked == true
+            };
+        }
+
+        internal async Task<string> ApplyWizardAndStartAsync(SetupWizardData data, Action<WizardProgress> progress)
+        {
+            if (data == null)
+                throw new ArgumentNullException(nameof(data));
+            progress = progress ?? (_ => { });
+            progress(new WizardProgress { Percent = 10, Text = "Применяем параметры мастера..." });
+            if (_storageLocations.Count == 0)
+                _storageLocations.Add(new StorageLocationSetting { Id = "primary", Enabled = true });
+            _storageLocations[0].Path = data.StoragePath;
+            RefreshStorageList();
+            StorageLocationsList.SelectedIndex = 0;
+            SelectMode(data.Mode);
+            BindBox.Text = data.Bind;
+            PublicBox.Text = data.PublicIp;
+            HttpPortBox.Text = data.HttpPort;
+            HttpsPortBox.Text = data.HttpsPort;
+            AdminPathBox.Text = data.AdminPath;
+            UserPathBox.Text = data.UserPath;
+            VpsHostBox.Text = data.VpsHost ?? string.Empty;
+            VpsPortBox.Text = string.IsNullOrWhiteSpace(data.VpsPort) ? "22" : data.VpsPort;
+            VpsUserBox.Text = string.IsNullOrWhiteSpace(data.VpsUser) ? "root" : data.VpsUser;
+            if (!string.IsNullOrWhiteSpace(data.VpsPassword))
+                VpsPasswordBox.Password = data.VpsPassword;
+            VpsSudoBox.IsChecked = data.VpsUseSudo;
+            DomainBox.Text = data.Domain;
+            SelectDnsMode(data.DnsMode);
+            DnsServerBox.Text = data.DnsServer;
+            DnsZoneBox.Text = data.DnsZone;
+            DnsKeyNameBox.Text = data.DnsKeyName;
+            SelectDnsAlgorithm(data.DnsAlgorithm);
+            if (!string.IsNullOrWhiteSpace(data.DnsSecret))
+                DnsSecretBox.Password = data.DnsSecret;
+            DnsAutoAddressBox.IsChecked = data.DnsAutoAddress;
+            AcmeEmailBox.Text = data.AcmeEmail;
+            AcmeTermsBox.IsChecked = data.AcmeTerms;
+            EmailBox.Text = data.Email;
+            PasswordBox.Password = data.Password ?? string.Empty;
+            RepeatPasswordBox.Password = data.RepeatPassword ?? string.Empty;
+            TrayAutoStartBox.IsChecked = data.TrayAutoStart;
+            ModeBox_OnSelectionChanged(null, null);
+            DnsModeBox_OnSelectionChanged(null, null);
+
+            progress(new WizardProgress { Percent = 25, Text = "Сохраняем конфигурацию и учётную запись..." });
+            await SaveConfigurationAsync();
+            ApplyTrayAutoStartSetting();
+
+            var crypto = new CryptoService();
+            using (var db = new Database(crypto))
+            {
+                var settings = db.GetSettings();
+                if (DnsUpdateService.IsConfigured(settings))
+                {
+                    progress(new WizardProgress { Percent = 40, Text = "Проверяем RFC2136/TSIG и A-запись..." });
+                    using (var log = new LogService())
+                    {
+                        var dns = new DnsUpdateService(db, crypto, log);
+                        var dnsResult = await dns.TestAsync(settings);
+                        if (!dnsResult.Success)
+                            throw new InvalidOperationException("DNS: " + dnsResult.Error);
+                    }
+                }
+            }
+
+            progress(new WizardProgress { Percent = 55, Text = "Проверяем Windows Firewall..." });
+            var windows = new WindowsNetworkService();
+            AppSettings saved;
+            using (var db = new Database(new CryptoService()))
+                saved = db.GetSettings();
+            var firewall = windows.EnsureFirewall(saved.HttpPort, saved.HttpsPort);
+            if (!firewall.Success)
+                throw new InvalidOperationException(firewall.Output);
+
+            if (string.Equals(saved.PublicMode, "Vps", StringComparison.OrdinalIgnoreCase))
+            {
+                progress(new WizardProgress { Percent = 65, Text = "Настраиваем VPS-туннель..." });
+                await ConfigureVpsIfNeededAsync();
+            }
+
+            if (string.Equals(saved.PublicMode, "Direct", StringComparison.OrdinalIgnoreCase) && saved.EnableHttps)
+            {
+                progress(new WizardProgress { Percent = 70, Text = "Выпускаем и устанавливаем HTTPS-сертификат..." });
+                await ConfigureHttpsAsync(false);
+            }
+            else
+            {
+                progress(new WizardProgress { Percent = 75, Text = "Устанавливаем или перезапускаем службу Windows..." });
+                var serviceResult = _serviceInstaller.IsInstalled() ? _serviceInstaller.RestartInternal() : _serviceInstaller.InstallInternal();
+                if (!serviceResult.Success)
+                    throw new InvalidOperationException(serviceResult.Output);
+            }
+
+            _configured = true;
+            if (_trayIcon != null)
+                _trayIcon.Visible = true;
+            progress(new WizardProgress { Percent = 88, Text = "Проверяем фактическое состояние сервера..." });
+            var report = await RunControlDiagnosticsAsync(true);
+            if (report.Level == ControlHealthLevel.Error)
+                throw new InvalidOperationException(report.Summary + " Откройте «Диагностика» для подробностей.");
+            RefreshRuntimeSummary();
+            MainTabs.SelectedItem = OverviewTab;
+            progress(new WizardProgress { Percent = 100, Text = "APTOFI File Sharing готов к работе." });
+            return report.Level == ControlHealthLevel.Warning
+                ? "APTOFI File Sharing запущен, но есть предупреждения. Откройте «Диагностика» для проверки."
+                : "APTOFI File Sharing настроен и работает. Все основные проверки пройдены.";
+        }
+
+        internal async Task<ControlHealthReport> RunControlDiagnosticsAsync(bool deepDnsTest)
+        {
+            var report = new ControlHealthReport { CheckedUtc = DateTime.UtcNow, Level = ControlHealthLevel.Ok };
+            var status = _serviceInstaller.Status();
+            var serviceRunning = status == ServiceControllerStatus.Running;
+            AddHealth(report, "service", UiText.Get(_language, "healthService"), serviceRunning ? ControlHealthLevel.Ok : ControlHealthLevel.Error,
+                serviceRunning ? UiText.Get(_language, "serviceRunning") : UiText.Get(_language, "serviceStopped"),
+                serviceRunning ? null : UiText.Get(_language, "recommendStartService"));
+
+            AppSettings settings = null;
+            try
+            {
+                var crypto = new CryptoService();
+                using (var db = new Database(crypto))
+                    settings = db.GetSettings();
+            }
+            catch (Exception ex)
+            {
+                AddHealth(report, "database", "База данных", ControlHealthLevel.Error, ex.Message, "Проверьте файлы базы и права доступа рядом с afsharing.exe.");
+            }
+
+            if (settings != null)
+            {
+                bool httpOk;
+                bool httpsOk;
+                if (deepDnsTest)
+                {
+                    httpOk = serviceRunning && await IsHttpAliveAsync(settings.HttpPort);
+                    httpsOk = !settings.EnableHttps || (serviceRunning && await IsHttpsAliveAsync(settings));
+                }
+                else
+                {
+                    httpOk = serviceRunning && IsTcpPortListening(settings.HttpPort);
+                    httpsOk = !settings.EnableHttps || (serviceRunning && IsTcpPortListening(settings.HttpsPort));
+                }
+
+                AddHealth(report, "http", UiText.Get(_language, "healthHttp"), httpOk ? ControlHealthLevel.Ok : ControlHealthLevel.Error,
+                    httpOk ? "HTTP " + settings.HttpPort + " слушается" : "HTTP " + settings.HttpPort + " не слушается",
+                    httpOk ? null : "Проверьте службу Windows и занятость HTTP-порта.");
+
+                if (settings.EnableHttps)
+                {
+                    AddHealth(report, "https", UiText.Get(_language, "healthHttps"), httpsOk ? ControlHealthLevel.Ok : ControlHealthLevel.Error,
+                        httpsOk ? "HTTPS " + settings.HttpsPort + " слушается" : "HTTPS " + settings.HttpsPort + " не слушается",
+                        httpsOk ? null : "Проверьте сертификат, HTTPS-привязку и службу Windows.");
+                }
+                else
+                {
+                    AddHealth(report, "https", UiText.Get(_language, "healthHttps"), ControlHealthLevel.Unknown, UiText.Get(_language, "httpsDisabled"), null);
+                }
+
+                var storageOk = true;
+                var storageMessage = new List<string>();
+                foreach (var location in StorageService.GetLocations(settings).Where(x => x.Enabled))
+                {
+                    try
+                    {
+                        if (string.IsNullOrWhiteSpace(location.Path) || !Directory.Exists(location.Path))
+                        {
+                            storageOk = false;
+                            storageMessage.Add((location.Path ?? "<empty>") + " недоступен");
+                        }
+                        else
+                        {
+                            var drive = new DriveInfo(Path.GetPathRoot(Path.GetFullPath(location.Path)));
+                            storageMessage.Add(location.Path + " — свободно " + FormatBytes(drive.AvailableFreeSpace));
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        storageOk = false;
+                        storageMessage.Add((location.Path ?? "<storage>") + ": " + ex.Message);
+                    }
+                }
+                AddHealth(report, "storage", UiText.Get(_language, "healthStorage"), storageOk ? ControlHealthLevel.Ok : ControlHealthLevel.Error,
+                    storageMessage.Count == 0 ? "Хранилище не настроено" : string.Join("; ", storageMessage),
+                    storageOk ? null : "Проверьте подключение диска, путь и права записи.");
+
+                if (!string.IsNullOrWhiteSpace(settings.Domain))
+                {
+                    if (deepDnsTest)
+                    {
+                        try
+                        {
+                            var addresses = await Dns.GetHostAddressesAsync(settings.Domain);
+                            var ipv4 = addresses.FirstOrDefault(x => x.AddressFamily == AddressFamily.InterNetwork);
+                            var level = ipv4 == null ? ControlHealthLevel.Error : ControlHealthLevel.Ok;
+                            var message = ipv4 == null ? "A-запись не найдена" : settings.Domain + " → " + ipv4;
+                            AddHealth(report, "dns", UiText.Get(_language, "healthDns"), level, message,
+                                level == ControlHealthLevel.Ok ? null : "Проверьте домен и DNS-сервер.");
+                        }
+                        catch (Exception ex)
+                        {
+                            AddHealth(report, "dns", UiText.Get(_language, "healthDns"), ControlHealthLevel.Error, ex.Message, "Проверьте домен и DNS-сервер.");
+                        }
+                    }
+                    else if (DnsUpdateService.IsConfigured(settings))
+                    {
+                        var message = settings.DnsAutoUpdateAddress ? "RFC2136/TSIG настроен · автообновление A включено" : "RFC2136/TSIG настроен · автообновление A выключено";
+                        if (settings.LastDnsUpdateUtc.HasValue)
+                            message += " · последняя успешная синхронизация " + settings.LastDnsUpdateUtc.Value.ToLocalTime().ToString("G");
+                        AddHealth(report, "dns", UiText.Get(_language, "healthDns"), ControlHealthLevel.Ok, message, null);
+                    }
+                    else
+                    {
+                        AddHealth(report, "dns", UiText.Get(_language, "healthDns"), ControlHealthLevel.Unknown, "Внешний DNS · проверяется только вручную", null);
+                    }
+                }
+                else
+                {
+                    AddHealth(report, "dns", UiText.Get(_language, "healthDns"), ControlHealthLevel.Unknown, "Домен не настроен", null);
+                }
+
+                if (deepDnsTest && DnsUpdateService.IsConfigured(settings))
+                {
+                    try
+                    {
+                        var crypto = new CryptoService();
+                        using (var db = new Database(crypto))
+                        using (var log = new LogService())
+                        {
+                            var dns = new DnsUpdateService(db, crypto, log);
+                            var result = await dns.TestAsync(settings);
+                            AddHealth(report, "dns_update", "RFC2136 / TSIG", result.Success ? ControlHealthLevel.Ok : ControlHealthLevel.Error,
+                                result.Success ? "DNS UPDATE выполнен успешно" : result.Error,
+                                result.Success ? null : "Проверьте DNS zone, имя/алгоритм/secret TSIG и сетевой маршрут до DNS-провайдера.");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        AddHealth(report, "dns_update", "RFC2136 / TSIG", ControlHealthLevel.Error, ex.Message, "Проверьте параметры TSIG и журнал приложения.");
+                    }
+                }
+
+                if (settings.EnableHttps)
+                {
+                    var certLevel = ControlHealthLevel.Error;
+                    var certMessage = "Сертификат не установлен";
+                    try
+                    {
+                        if (!string.IsNullOrWhiteSpace(settings.CertificateThumbprint))
+                        {
+                            using (var store = new X509Store(StoreName.My, StoreLocation.LocalMachine))
+                            {
+                                store.Open(OpenFlags.ReadOnly);
+                                var found = store.Certificates.Find(X509FindType.FindByThumbprint, settings.CertificateThumbprint, false);
+                                if (found.Count > 0)
+                                {
+                                    var cert = found[0];
+                                    var remaining = cert.NotAfter.ToUniversalTime() - DateTime.UtcNow;
+                                    certLevel = remaining.TotalDays <= 7 ? ControlHealthLevel.Warning : remaining.TotalSeconds > 0 ? ControlHealthLevel.Ok : ControlHealthLevel.Error;
+                                    certMessage = "Действителен до " + cert.NotAfter.ToLocalTime().ToString("G") + " (" + Math.Max(0, (int)remaining.TotalDays) + " дн.)";
+                                }
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        certMessage = ex.Message;
+                    }
+                    AddHealth(report, "certificate", UiText.Get(_language, "healthCertificate"), certLevel, certMessage,
+                        certLevel == ControlHealthLevel.Ok ? null : "На вкладке «Домен и HTTPS» проверьте DNS и настройте HTTPS.");
+                }
+                else
+                {
+                    AddHealth(report, "certificate", UiText.Get(_language, "healthCertificate"), ControlHealthLevel.Unknown, "Не требуется в локальном режиме", null);
+                }
+
+                if (string.Equals(settings.PublicMode, "Local", StringComparison.OrdinalIgnoreCase))
+                    AddHealth(report, "external", UiText.Get(_language, "healthExternal"), ControlHealthLevel.Unknown, "Локальный режим", null);
+                else if (deepDnsTest)
+                    AddHealth(report, "external", UiText.Get(_language, "healthExternal"), ControlHealthLevel.Unknown, UiText.Get(_language, "externalNotChecked"), "Публичная доступность зависит от маршрутизации, NAT, firewall, DNS и провайдера. При необходимости проверьте с внешней сети.");
+                else
+                    AddHealth(report, "external", UiText.Get(_language, "healthExternal"), ControlHealthLevel.Unknown, "Не проверяется в обычном режиме", null);
+            }
+
+            report.Level = report.Items.Any(x => x.Level == ControlHealthLevel.Error) ? ControlHealthLevel.Error
+                : report.Items.Any(x => x.Level == ControlHealthLevel.Warning) ? ControlHealthLevel.Warning
+                : ControlHealthLevel.Ok;
+            report.Summary = report.Level == ControlHealthLevel.Ok ? UiText.Get(_language, "healthAllOk")
+                : report.Level == ControlHealthLevel.Warning ? UiText.Get(_language, "healthWarnings")
+                : UiText.Get(_language, "healthProblems");
+            return report;
+        }
+
+        private static void AddHealth(ControlHealthReport report, string key, string name, ControlHealthLevel level, string message, string recommendation)
+        {
+            report.Items.Add(new ControlHealthItem { Key = key, Name = name, Level = level, Message = message, Recommendation = recommendation });
+        }
+
+        private async Task RefreshHealthAsync()
+        {
+            if (_healthBusy || !_configured)
+                return;
+            _healthBusy = true;
+            try
+            {
+                var report = await RunControlDiagnosticsAsync(false);
+                ApplyHealthReport(report);
+            }
+            catch
+            {
+            }
+            finally
+            {
+                _healthBusy = false;
+            }
+        }
+
+        private void ApplyHealthReport(ControlHealthReport report)
+        {
+            if (report == null)
+                return;
+            SetHealthValue(HealthServiceValue, report.Items.FirstOrDefault(x => x.Key == "service"));
+            SetHealthValue(HealthHttpValue, report.Items.FirstOrDefault(x => x.Key == "http"));
+            SetHealthValue(HealthHttpsValue, report.Items.FirstOrDefault(x => x.Key == "https"));
+            SetHealthValue(HealthDnsValue, report.Items.FirstOrDefault(x => x.Key == "dns"));
+            SetHealthValue(HealthCertificateValue, report.Items.FirstOrDefault(x => x.Key == "certificate"));
+            SetHealthValue(HealthStorageValue, report.Items.FirstOrDefault(x => x.Key == "storage"));
+            SetHealthValue(HealthExternalValue, report.Items.FirstOrDefault(x => x.Key == "external"));
+
+            var brush = report.Level == ControlHealthLevel.Ok ? Brushes.SeaGreen : report.Level == ControlHealthLevel.Warning ? Brushes.DarkOrange : Brushes.Firebrick;
+            HeaderStatusDot.Fill = brush;
+            OverviewStateDot.Fill = brush;
+            OverviewStateText.Text = report.Level == ControlHealthLevel.Ok ? UiText.Get(_language, "healthRunning")
+                : report.Level == ControlHealthLevel.Warning ? UiText.Get(_language, "healthRunningWarnings")
+                : UiText.Get(_language, "healthError");
+            StatusText.Text = OverviewStateText.Text;
+
+            if (_lastHealthLevel != ControlHealthLevel.Unknown && _lastHealthLevel != report.Level && report.Level == ControlHealthLevel.Error && _trayIcon != null)
+            {
+                _trayIcon.BalloonTipTitle = AppVersion.ProductName;
+                _trayIcon.BalloonTipText = "Обнаружена проблема в работе сервера. Откройте «Диагностика».";
+                _trayIcon.ShowBalloonTip(5000);
+            }
+            _lastHealthLevel = report.Level;
+        }
+
+        private static void SetHealthValue(TextBlock target, ControlHealthItem item)
+        {
+            if (target == null)
+                return;
+            if (item == null)
+            {
+                target.Text = "—";
+                target.Foreground = Brushes.DimGray;
+                return;
+            }
+            target.Text = (item.Level == ControlHealthLevel.Ok ? "✓ " : item.Level == ControlHealthLevel.Warning ? "! " : item.Level == ControlHealthLevel.Error ? "✕ " : "• ") + item.Message;
+            target.Foreground = item.Level == ControlHealthLevel.Ok ? Brushes.SeaGreen : item.Level == ControlHealthLevel.Warning ? Brushes.DarkOrange : item.Level == ControlHealthLevel.Error ? Brushes.Firebrick : Brushes.DimGray;
+        }
+
+        private static bool IsTcpPortListening(int port)
+        {
+            if (port < 1 || port > 65535)
+                return false;
+            try
+            {
+                return IPGlobalProperties.GetIPGlobalProperties()
+                    .GetActiveTcpListeners()
+                    .Any(endpoint => endpoint.Port == port);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static async Task<bool> IsHttpAliveAsync(int port)
+        {
+            if (port < 1)
+                return false;
+            try
+            {
+                using (var handler = new HttpClientHandler { AllowAutoRedirect = false })
+                using (var client = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(3) })
+                using (var response = await client.GetAsync("http://127.0.0.1:" + port + "/favicon.ico"))
+                    return (int)response.StatusCode < 500;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static async Task<bool> IsHttpsAliveAsync(AppSettings settings)
+        {
+            if (settings == null || settings.HttpsPort < 1)
+                return false;
+            try
+            {
+                using (var client = new TcpClient(AddressFamily.InterNetwork))
+                {
+                    var connect = client.ConnectAsync(IPAddress.Loopback, settings.HttpsPort);
+                    var completed = await Task.WhenAny(connect, Task.Delay(3000));
+                    if (completed != connect)
+                        return false;
+                    await connect;
+                    string remoteThumbprint = null;
+                    using (var ssl = new SslStream(client.GetStream(), false, (sender, certificate, chain, errors) =>
+                    {
+                        if (certificate != null)
+                        {
+                            using (var cert = new X509Certificate2(certificate))
+                                remoteThumbprint = cert.Thumbprint;
+                        }
+                        return true;
+                    }))
+                    {
+                        var target = !string.IsNullOrWhiteSpace(settings.HttpsIdentifier) ? settings.HttpsIdentifier :
+                            !string.IsNullOrWhiteSpace(settings.Domain) ? settings.Domain : "localhost";
+                        var auth = ssl.AuthenticateAsClientAsync(target, null, SslProtocols.Tls12, false);
+                        var authCompleted = await Task.WhenAny(auth, Task.Delay(4000));
+                        if (authCompleted != auth)
+                            return false;
+                        await auth;
+                        if (!ssl.IsAuthenticated || !ssl.IsEncrypted)
+                            return false;
+                        if (!string.IsNullOrWhiteSpace(settings.CertificateThumbprint) && !string.IsNullOrWhiteSpace(remoteThumbprint))
+                            return string.Equals(NormalizeThumbprint(settings.CertificateThumbprint), NormalizeThumbprint(remoteThumbprint), StringComparison.OrdinalIgnoreCase);
+                        return true;
+                    }
+                }
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static string NormalizeThumbprint(string value)
+        {
+            return (value ?? string.Empty).Replace(" ", string.Empty).Trim();
+        }
+
         private sealed class ConfigurationInput
         {
             public List<StorageLocationSetting> StorageLocations { get; set; }
@@ -1259,6 +2131,12 @@ namespace APTOFI.FileSharing
             public string Password { get; set; }
             public string RepeatPassword { get; set; }
             public bool TrayAutoStart { get; set; }
+            public string LogRetentionDaysText { get; set; }
+            public string LogMaxFileMiBText { get; set; }
+            public string LogMaxDirectoryMiBText { get; set; }
+            public string LogMaintenanceIntervalMinutesText { get; set; }
+            public string AccessLogMode { get; set; }
+            public string AccessLogAggregateMinutesText { get; set; }
             public string Language { get; set; }
         }
     }

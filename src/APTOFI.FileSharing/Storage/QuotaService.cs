@@ -1,3 +1,7 @@
+// Date: 2026-08-20
+// Time: 03:15:00 Europe/London
+// File version: 1.1.25
+// Description: Enforces real personal, server-wide, per-location and physical disk capacity; recycle-bin files remain counted until permanently removed.
 using System;
 using System.IO;
 using System.Linq;

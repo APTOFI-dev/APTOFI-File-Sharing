@@ -1,4 +1,4 @@
-# APTOFI File Sharing 1.1.35
+# APTOFI File Sharing 1.1.36
 
 [English](../README.md) · [Русский](README.ru.md) · [Deutsch](README.de.md) · [Українська](README.uk.md) · [Français](README.fr.md) · [Polski](README.pl.md) · [Türkçe](README.tr.md) · [한국어](README.ko.md) · **中文** · [日本語](README.ja.md)
 
@@ -73,3 +73,7 @@ Auto A update: on
 ## 许可证
 
 根据 **APTOFI Attribution License 1.0** 可使用、修改、分发，但必须保留 **APTOFI.COM** 和 **https://aptofi.com** 署名。
+
+## 日志轮转与访问日志
+
+1.1.36 内置可配置的日志轮转和按 IP 聚合的精简访问日志。默认设置：保留 7 天、单个日志文件最多 20 MiB、`logs` 目录总计最多 150 MiB、每 60 分钟检查一次轮转，并在同一 IP 连续 30 分钟无活动后写入一条汇总记录。管理员可在 **Logs** 选项卡中调整这些参数，或切换为记录每个 HTTP 请求的完整模式。管理员/用户秘密路径以及公开分享令牌会在日志路径中被隐藏。

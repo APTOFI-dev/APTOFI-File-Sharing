@@ -1,3 +1,7 @@
+// Date: 2026-08-20
+// Time: 03:17:00 Europe/London
+// File version: 1.1.0
+// Description: Installs, repairs, restarts and controls the immediate automatic APTOFI Windows service with recovery settings.
 using System;
 using System.Diagnostics;
 using System.ServiceProcess;

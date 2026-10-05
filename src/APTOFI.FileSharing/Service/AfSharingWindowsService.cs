@@ -1,3 +1,7 @@
+// Date: 2026-08-19
+// Time: 04:34:47 Europe/London
+// File version: 1.0.2
+// Description: Runs APTOFI File Sharing as an automatic Windows service before any interactive user login.
 using System;
 using System.IO;
 using System.ServiceProcess;

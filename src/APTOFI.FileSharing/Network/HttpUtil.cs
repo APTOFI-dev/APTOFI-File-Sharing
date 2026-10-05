@@ -1,3 +1,7 @@
+// Date: 2026-08-21
+// Time: 06:58:49 Europe/London
+// File version: 1.1.7
+// Description: Provides bounded UTF-8 JSON, legacy filename repair, HTML, error and request-body helpers for the built-in HTTP server.
 using System;
 using System.IO;
 using System.Net;

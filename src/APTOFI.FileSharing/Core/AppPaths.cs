@@ -1,3 +1,7 @@
+// Date: 2026-08-21
+// Time: 04:58:17 Europe/London
+// File version: 1.1.6
+// Description: Resolves all application runtime paths including branding files next to afsharing.exe.
 using System;
 using System.IO;
 

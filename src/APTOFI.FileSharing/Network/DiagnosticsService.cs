@@ -1,3 +1,7 @@
+// Date: 2026-08-20
+// Time: 08:05:00 Europe/London
+// File version: 1.1.4
+// Description: Runs actionable diagnostics including canonical HTTPS reachability and public HTTP-to-HTTPS redirect validation.
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -268,14 +272,13 @@ namespace APTOFI.FileSharing.Network
         {
             try
             {
-                var ip = (await Client.GetStringAsync("https://api.ipify.org").ConfigureAwait(false)).Trim();
-                var ok = IPAddress.TryParse(ip, out _);
-                Add(report, "public_ip", ok, ok ? "Detected public IP: " + ip : "The public IP response is invalid.", ok ? null : "Check Internet connectivity.");
-                return ok ? ip : null;
+                var ip = await PublicIpDetector.DetectIpv4TextAsync(TimeSpan.FromSeconds(8)).ConfigureAwait(false);
+                Add(report, "public_ip", true, "Detected public IP: " + ip, null);
+                return ip;
             }
             catch (Exception ex)
             {
-                Add(report, "public_ip", false, "Public IP could not be detected.", "Check Internet connectivity and TLS support.", ex.Message);
+                Add(report, "public_ip", false, "Public IP could not be detected.", "Check Internet connectivity, firewall, proxy and routing. APTOFI cannot guarantee third-party network routes or DNS-provider availability.", ex.Message);
                 return null;
             }
         }
