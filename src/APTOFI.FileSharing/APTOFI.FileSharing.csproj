@@ -93,6 +93,7 @@
     <Compile Include="Core\Models.cs" />
     <Compile Include="Core\MimeTypes.cs" />
     <Compile Include="Core\UiText.cs" />
+    <Compile Include="Core\UiTextPatch.cs" />
     <Compile Include="Data\Database.cs" />
     <Compile Include="Security\CryptoService.cs" />
     <Compile Include="Security\PasswordService.cs" />

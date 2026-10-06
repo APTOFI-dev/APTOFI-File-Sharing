@@ -1025,7 +1025,11 @@ namespace APTOFI.FileSharing.Core
                 map = Values["en"];
             if (map.TryGetValue(key, out var value))
                 return value;
+            if (UiTextPatch.TryGet(language ?? "en", key, out value))
+                return value;
             if (Values["en"].TryGetValue(key, out value))
+                return value;
+            if (UiTextPatch.TryGet("en", key, out value))
                 return value;
             return key;
         }

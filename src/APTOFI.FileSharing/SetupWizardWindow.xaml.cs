@@ -24,10 +24,90 @@ namespace APTOFI.FileSharing
             _owner = owner ?? throw new ArgumentNullException(nameof(owner));
             _firstRun = firstRun;
             Owner = owner;
+            ApplyLanguage();
             ModeBox.SelectedIndex = 0;
             DnsModeBox.SelectedIndex = 1;
             DnsAlgorithmBox.SelectedIndex = 0;
             LoadFromOwner();
+            UpdateStep();
+        }
+
+        private string T(string key)
+        {
+            return UiText.Get(_owner.CurrentLanguage, key);
+        }
+
+        private string F(string key, params object[] args)
+        {
+            return string.Format(T(key), args);
+        }
+
+        private void ApplyLanguage()
+        {
+            Title = AppVersion.ProductName + " — " + T("setupWizard");
+            WizardTitle.Text = T("wizardTitle");
+            WizardSubtitle.Text = T("wizardSubtitle");
+            StepStorageItem.Content = "1. " + T("storageTab");
+            StepNetworkItem.Content = "2. " + T("networkTab");
+            StepDomainItem.Content = "3. " + T("domainHttpsTab");
+            StepAccountItem.Content = "4. " + T("accountTab");
+            StepCheckItem.Content = "5. " + T("wizardFinalTitle");
+
+            StorageTitleText.Text = T("storageTab");
+            StorageHintText.Text = T("wizardStorageHint");
+            StorageFolderLabel.Text = T("wizardStorageFolder");
+            BrowseStorageButton.Content = T("browse");
+            StorageCheckText.Text = T("wizardNotChecked");
+
+            NetworkTitleText.Text = T("networkTab");
+            NetworkHintText.Text = T("wizardNetworkHint");
+            WizardModeLabel.Text = T("mode");
+            ModeDirectItem.Content = T("direct");
+            ModeVpsItem.Content = T("vps");
+            ModeLocalItem.Content = T("local");
+            WizardBindLabel.Text = T("bind");
+            WizardPublicIpLabel.Text = T("publicIp");
+            WizardHttpLabel.Text = T("http");
+            WizardHttpsLabel.Text = T("https");
+            WizardAdminPathLabel.Text = T("adminPath");
+            WizardUserPathLabel.Text = T("userPath");
+            WizardVpsSectionLabel.Text = T("vpsSetup");
+            WizardVpsHostLabel.Text = T("vpsHost");
+            WizardVpsPortLabel.Text = T("vpsPort");
+            WizardVpsUserLabel.Text = T("vpsUser");
+            WizardVpsPasswordLabel.Text = T("vpsPassword");
+            VpsSudoBox.Content = T("vpsSudo");
+            NetworkCheckText.Text = T("wizardNotChecked");
+
+            DomainTitleText.Text = T("domainHttpsTab");
+            WizardDomainHintText.Text = T("wizardDomainHint");
+            WizardDomainLabel.Text = T("domain");
+            WizardDnsModeLabel.Text = T("dnsMode");
+            DnsManualItem.Content = T("dnsManual");
+            DnsRfcItem.Content = T("dnsRfc2136");
+            WizardDnsServerLabel.Text = T("dnsServer");
+            WizardDnsZoneLabel.Text = T("dnsZone");
+            WizardDnsKeyLabel.Text = T("dnsKeyName");
+            WizardDnsAlgorithmLabel.Text = T("dnsAlgorithm");
+            WizardDnsSecretLabel.Text = T("dnsSecret");
+            DnsAutoAddressBox.Content = T("dnsAutoAddress");
+            WizardAcmeEmailLabel.Text = T("acmeEmail");
+            AcmeTermsBox.Content = T("caTerms");
+            DnsCheckText.Text = T("wizardDnsFinalPending");
+
+            AccountTitleText.Text = T("accountTab");
+            AccountHintText.Text = T("wizardAccountHint");
+            WizardEmailLabel.Text = T("email");
+            WizardPasswordLabel.Text = T("password");
+            WizardRepeatLabel.Text = T("repeat");
+            TrayAutoStartBox.Content = T("trayAutostart");
+            AccountCheckText.Text = T("wizardAccountPending");
+
+            FinalTitleText.Text = T("wizardFinalTitle");
+            FinalHintText.Text = T("wizardFinalHint");
+            FinalResultText.Text = T("wizardReadyToCheck");
+            CancelButton.Content = T("close");
+            BackButton.Content = T("back");
             UpdateStep();
         }
 
@@ -80,7 +160,7 @@ namespace APTOFI.FileSharing
         {
             using (var dialog = new WinForms.FolderBrowserDialog())
             {
-                dialog.Description = "Выберите каталог хранения APTOFI File Sharing";
+                dialog.Description = T("selectStorageDialog");
                 dialog.SelectedPath = StoragePathBox.Text;
                 if (dialog.ShowDialog() == WinForms.DialogResult.OK)
                     StoragePathBox.Text = dialog.SelectedPath;
@@ -154,7 +234,7 @@ namespace APTOFI.FileSharing
         {
             var path = (StoragePathBox.Text ?? string.Empty).Trim();
             if (string.IsNullOrWhiteSpace(path))
-                throw new InvalidOperationException("Выберите каталог хранения.");
+                throw new InvalidOperationException(T("selectStorageError"));
             path = Path.GetFullPath(path);
             Directory.CreateDirectory(path);
             var testPath = Path.Combine(path, ".aptofi-setup-test-" + Guid.NewGuid().ToString("N"));
@@ -163,10 +243,10 @@ namespace APTOFI.FileSharing
                 File.WriteAllText(testPath, "APTOFI");
                 var text = File.ReadAllText(testPath);
                 if (!string.Equals(text, "APTOFI", StringComparison.Ordinal))
-                    throw new IOException("Контрольное чтение тестового файла не совпало.");
+                    throw new IOException(T("storageReadMismatch"));
                 var root = Path.GetPathRoot(path);
                 var drive = new DriveInfo(root);
-                StorageCheckText.Text = "✓ Каталог доступен\n✓ Запись и чтение работают\n✓ Свободно: " + FormatBytes(drive.AvailableFreeSpace);
+                StorageCheckText.Text = "✓ " + T("storageDirectoryAvailable") + "\n✓ " + T("storageReadWriteOk") + "\n✓ " + T("freePrefix") + " " + FormatBytes(drive.AvailableFreeSpace);
                 StorageCheckText.Foreground = System.Windows.Media.Brushes.SeaGreen;
                 StoragePathBox.Text = path;
             }
@@ -180,23 +260,23 @@ namespace APTOFI.FileSharing
         private async Task ValidateNetworkAsync()
         {
             if (!int.TryParse(HttpPortBox.Text, out var httpPort) || httpPort < 1 || httpPort > 65535)
-                throw new InvalidOperationException("Некорректный HTTP-порт.");
+                throw new InvalidOperationException(T("invalidHttpPort"));
             if (!int.TryParse(HttpsPortBox.Text, out var httpsPort) || httpsPort < 1 || httpsPort > 65535 || httpsPort == httpPort)
-                throw new InvalidOperationException("Некорректный HTTPS-порт или он совпадает с HTTP-портом.");
+                throw new InvalidOperationException(T("invalidHttpsPort"));
             var httpFree = CanBind(httpPort);
             var httpsFree = CanBind(httpsPort);
             if (_firstRun && (!httpFree || !httpsFree))
-                throw new InvalidOperationException("Один из выбранных портов уже занят. HTTP " + httpPort + ": " + (httpFree ? "свободен" : "занят") + "; HTTPS " + httpsPort + ": " + (httpsFree ? "свободен" : "занят") + ".");
+                throw new InvalidOperationException(F("wizardPortsBusy", httpPort, T(httpFree ? "portFree" : "portBusy"), httpsPort, T(httpsFree ? "portFree" : "portBusy")));
             if (string.IsNullOrWhiteSpace(AdminPathBox.Text) || string.IsNullOrWhiteSpace(UserPathBox.Text))
-                throw new InvalidOperationException("Секретные пути администратора и пользователей не должны быть пустыми.");
+                throw new InvalidOperationException(T("secretPathsRequired"));
             if (string.Equals(SelectedTag(ModeBox), "Vps", StringComparison.OrdinalIgnoreCase))
             {
                 if (string.IsNullOrWhiteSpace(VpsHostBox.Text) || string.IsNullOrWhiteSpace(VpsUserBox.Text))
-                    throw new InvalidOperationException("Для VPS-режима укажите IP/домен VPS и SSH-пользователя.");
+                    throw new InvalidOperationException(T("vpsFieldsRequired"));
                 if (!int.TryParse(VpsPortBox.Text, out var vpsPort) || vpsPort < 1 || vpsPort > 65535)
-                    throw new InvalidOperationException("Некорректный SSH-порт VPS.");
+                    throw new InvalidOperationException(T("invalidVpsPort"));
                 if (_firstRun && string.IsNullOrWhiteSpace(VpsPasswordBox.Password))
-                    throw new InvalidOperationException("Для первого запуска VPS-режима укажите SSH / sudo пароль.");
+                    throw new InvalidOperationException(T("vpsPasswordRequired"));
             }
             var publicText = string.Empty;
             if (string.Equals(SelectedTag(ModeBox), "Direct", StringComparison.OrdinalIgnoreCase))
@@ -209,12 +289,12 @@ namespace APTOFI.FileSharing
                 }
                 catch
                 {
-                    publicText = "не удалось определить";
+                    publicText = T("detectFailed");
                 }
             }
-            NetworkCheckText.Text = "✓ Порты имеют корректный диапазон\n" +
-                                    (_firstRun ? "✓ Порты свободны для первого запуска\n" : "✓ Существующая конфигурация может использовать уже занятые службой порты\n") +
-                                    "✓ Публичный IPv4: " + (string.IsNullOrWhiteSpace(publicText) ? (PublicIpBox.Text ?? "—") : publicText);
+            NetworkCheckText.Text = "✓ " + T("portsRangeOk") + "\n" +
+                                    "✓ " + T(_firstRun ? "portsFreeFirstRun" : "portsExistingMayBeInUse") + "\n" +
+                                    "✓ " + T("publicIpv4Label") + " " + (string.IsNullOrWhiteSpace(publicText) ? (PublicIpBox.Text ?? "—") : publicText);
             NetworkCheckText.Foreground = System.Windows.Media.Brushes.SeaGreen;
         }
 
@@ -242,25 +322,25 @@ namespace APTOFI.FileSharing
             var mode = SelectedTag(ModeBox);
             if (string.Equals(mode, "Local", StringComparison.OrdinalIgnoreCase))
             {
-                DnsCheckText.Text = "✓ Локальный режим: домен и HTTPS не обязательны.";
+                DnsCheckText.Text = "✓ " + T("localDomainOptional");
                 DnsCheckText.Foreground = System.Windows.Media.Brushes.SeaGreen;
                 return;
             }
             if (string.IsNullOrWhiteSpace(DomainBox.Text))
-                throw new InvalidOperationException("Для интернет-режима укажите домен.");
+                throw new InvalidOperationException(T("domainRequired"));
             if (AcmeTermsBox.IsChecked != true)
-                throw new InvalidOperationException("Для автоматического HTTPS необходимо принять условия центра сертификации.");
+                throw new InvalidOperationException(T("caTermsRequired"));
             if (string.Equals(SelectedTag(DnsModeBox), "Rfc2136", StringComparison.OrdinalIgnoreCase))
             {
                 if (string.IsNullOrWhiteSpace(DnsServerBox.Text) || string.IsNullOrWhiteSpace(DnsZoneBox.Text) || string.IsNullOrWhiteSpace(DnsKeyBox.Text))
-                    throw new InvalidOperationException("Для RFC2136 заполните DNS-сервер, DNS-зону и имя TSIG-ключа.");
+                    throw new InvalidOperationException(T("rfcFieldsRequired"));
                 if (_firstRun && string.IsNullOrWhiteSpace(DnsSecretBox.Password))
-                    throw new InvalidOperationException("Укажите TSIG secret.");
-                DnsCheckText.Text = "✓ Поля RFC2136 заполнены.\nНа финальном шаге будет выполнено реальное DNS UPDATE и затем DNS-01/HTTPS.";
+                    throw new InvalidOperationException(T("tsigSecretRequired"));
+                DnsCheckText.Text = "✓ " + T("rfcFieldsOk") + "\n" + T("rfcFinalTestHint");
             }
             else
             {
-                DnsCheckText.Text = "✓ Выбран ручной DNS. Для сертификата потребуется доступность HTTP-01 на публичном TCP 80.";
+                DnsCheckText.Text = "✓ " + T("manualDnsSelected") + " " + T("manualDnsHttp01Hint");
             }
             DnsCheckText.Foreground = System.Windows.Media.Brushes.SeaGreen;
         }
@@ -268,17 +348,17 @@ namespace APTOFI.FileSharing
         private void ValidateAccount()
         {
             if (string.IsNullOrWhiteSpace(EmailBox.Text) || !EmailBox.Text.Contains("@"))
-                throw new InvalidOperationException("Укажите корректный email администратора.");
+                throw new InvalidOperationException(T("adminEmailInvalid"));
             if (_firstRun)
             {
                 if (PasswordBox.Password.Length < 8 || PasswordBox.Password != RepeatPasswordBox.Password)
-                    throw new InvalidOperationException("Пароль должен содержать не менее 8 символов, оба поля должны совпадать.");
+                    throw new InvalidOperationException(T("firstPasswordInvalid"));
             }
             else if (PasswordBox.Password.Length > 0 && (PasswordBox.Password.Length < 8 || PasswordBox.Password != RepeatPasswordBox.Password))
             {
-                throw new InvalidOperationException("Новый пароль должен содержать не менее 8 символов, оба поля должны совпадать.");
+                throw new InvalidOperationException(T("newPasswordInvalid"));
             }
-            AccountCheckText.Text = "✓ Учётная запись готова к сохранению.\n✓ Служба Windows будет установлена/перезапущена автоматически.";
+            AccountCheckText.Text = "✓ " + T("accountReady") + "\n✓ " + T("serviceAutoInstall");
             AccountCheckText.Foreground = System.Windows.Media.Brushes.SeaGreen;
         }
 
@@ -286,7 +366,7 @@ namespace APTOFI.FileSharing
         {
             FinalProgress.Value = 10;
             FinalResultText.Foreground = System.Windows.Media.Brushes.DimGray;
-            FinalResultText.Text = "Сохраняем конфигурацию...";
+            FinalResultText.Text = T("savingConfiguration");
             var data = Capture();
             var result = await _owner.ApplyWizardAndStartAsync(data, progress => Dispatcher.Invoke(() =>
             {
@@ -297,7 +377,7 @@ namespace APTOFI.FileSharing
             FinalProgress.Value = 100;
             FinalResultText.Text = result;
             FinalResultText.Foreground = System.Windows.Media.Brushes.SeaGreen;
-            NextButton.Content = "Готово";
+            NextButton.Content = T("done");
             NextButton.Click -= NextButton_OnClick;
             NextButton.Click += (s, e) => { DialogResult = true; Close(); };
             BackButton.IsEnabled = false;
@@ -348,7 +428,7 @@ namespace APTOFI.FileSharing
             WizardTabs.SelectedIndex = _step;
             StepsList.SelectedIndex = _step;
             BackButton.IsEnabled = _step > 0;
-            NextButton.Content = _step == 4 ? "Проверить и запустить" : "Далее";
+            NextButton.Content = T(_step == 4 ? "checkAndStart" : "next");
         }
 
         private void SetButtons(bool enabled)

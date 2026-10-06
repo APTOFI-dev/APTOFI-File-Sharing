@@ -1,7 +1,7 @@
 <Window x:Class="APTOFI.FileSharing.SetupWizardWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="APTOFI File Sharing — Первый запуск и настройка" Height="760" Width="960" MinHeight="680" MinWidth="860"
+        Title="APTOFI File Sharing — Setup" Height="760" Width="960" MinHeight="680" MinWidth="860"
         WindowStartupLocation="CenterOwner" ResizeMode="CanResize" Background="#F4F5F7">
     <Window.Resources>
         <Style TargetType="TextBox"><Setter Property="Height" Value="32"/><Setter Property="Margin" Value="4"/><Setter Property="Padding" Value="8,4"/></Style>
@@ -13,18 +13,18 @@
     <Grid Margin="18">
         <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
         <StackPanel Margin="0,0,0,12">
-            <TextBlock x:Name="WizardTitle" FontSize="24" FontWeight="SemiBold" Text="Первый запуск и настройка APTOFI File Sharing"/>
-            <TextBlock x:Name="WizardSubtitle" Foreground="#5D6270" Margin="0,5,0,0" TextWrapping="Wrap" Text="Программа проверит хранилище, сеть, DNS, HTTPS и запуск службы. После успешной настройки мастер больше не открывается автоматически."/>
+            <TextBlock x:Name="WizardTitle" FontSize="24" FontWeight="SemiBold" Text="First run and setup APTOFI File Sharing"/>
+            <TextBlock x:Name="WizardSubtitle" Foreground="#5D6270" Margin="0,5,0,0" TextWrapping="Wrap" Text="The wizard checks storage, network, DNS, HTTPS and Windows service startup."/>
         </StackPanel>
         <Grid Grid.Row="1">
             <Grid.ColumnDefinitions><ColumnDefinition Width="210"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
             <Border Background="#FFFFFF" CornerRadius="12" Padding="12" Margin="0,0,12,0">
                 <ListBox x:Name="StepsList" BorderThickness="0" IsHitTestVisible="False" SelectedIndex="0">
-                    <ListBoxItem>1. Хранилище</ListBoxItem>
-                    <ListBoxItem>2. Сеть</ListBoxItem>
-                    <ListBoxItem>3. Домен и HTTPS</ListBoxItem>
-                    <ListBoxItem>4. Аккаунт и запуск</ListBoxItem>
-                    <ListBoxItem>5. Проверка</ListBoxItem>
+                    <ListBoxItem x:Name="StepStorageItem">1. Storage</ListBoxItem>
+                    <ListBoxItem x:Name="StepNetworkItem">2. Network</ListBoxItem>
+                    <ListBoxItem x:Name="StepDomainItem">3. Domain and HTTPS</ListBoxItem>
+                    <ListBoxItem x:Name="StepAccountItem">4. Account and startup</ListBoxItem>
+                    <ListBoxItem x:Name="StepCheckItem">5. Check</ListBoxItem>
                 </ListBox>
             </Border>
             <Border Grid.Column="1" Background="#FFFFFF" CornerRadius="12" Padding="16">
@@ -32,67 +32,67 @@
                     <TabControl.Resources><Style TargetType="TabItem"><Setter Property="Visibility" Value="Collapsed"/></Style></TabControl.Resources>
                     <TabItem>
                         <StackPanel>
-                            <TextBlock FontSize="20" FontWeight="SemiBold" Text="Хранилище"/>
-                            <TextBlock Foreground="#5D6270" Margin="0,4,0,12" TextWrapping="Wrap" Text="Выберите основной каталог. Мастер проверит создание, чтение и удаление тестового файла."/>
-                            <TextBlock FontWeight="SemiBold" Text="Каталог хранения"/>
-                            <Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBox x:Name="StoragePathBox"/><Button x:Name="BrowseStorageButton" Grid.Column="1" Content="Выбрать" Click="BrowseStorageButton_OnClick"/></Grid>
-                            <Border Background="#F5F7F8" CornerRadius="8" Padding="12" Margin="4,12,4,0"><TextBlock x:Name="StorageCheckText" Text="Проверка ещё не выполнена." TextWrapping="Wrap"/></Border>
+                            <TextBlock x:Name="StorageTitleText" FontSize="20" FontWeight="SemiBold" Text="Storage"/>
+                            <TextBlock x:Name="StorageHintText" Foreground="#5D6270" Margin="0,4,0,12" TextWrapping="Wrap" Text="Choose the primary storage folder."/>
+                            <TextBlock x:Name="StorageFolderLabel" FontWeight="SemiBold" Text="Storage folder"/>
+                            <Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBox x:Name="StoragePathBox"/><Button x:Name="BrowseStorageButton" Grid.Column="1" Content="Browse" Click="BrowseStorageButton_OnClick"/></Grid>
+                            <Border Background="#F5F7F8" CornerRadius="8" Padding="12" Margin="4,12,4,0"><TextBlock x:Name="StorageCheckText" Text="Check has not been run yet." TextWrapping="Wrap"/></Border>
                         </StackPanel>
                     </TabItem>
                     <TabItem>
                         <ScrollViewer VerticalScrollBarVisibility="Auto"><StackPanel>
-                            <TextBlock FontSize="20" FontWeight="SemiBold" Text="Сеть"/>
-                            <TextBlock Foreground="#5D6270" Margin="0,4,0,12" TextWrapping="Wrap" Text="Выберите режим публикации и порты. Для DNS-01 публичные 80/443 не требуются."/>
-                            <TextBlock FontWeight="SemiBold" Text="Режим публикации"/>
-                            <ComboBox x:Name="ModeBox" SelectionChanged="ModeBox_OnSelectionChanged"><ComboBoxItem Tag="Direct">Белый IP / прямой доступ</ComboBoxItem><ComboBoxItem Tag="Vps">VPS / защищённый туннель</ComboBoxItem><ComboBoxItem Tag="Local">Только локальная сеть</ComboBoxItem></ComboBox>
-                            <Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions><StackPanel><TextBlock FontWeight="SemiBold" Text="Локальный IP привязки"/><TextBox x:Name="BindBox" Text="0.0.0.0"/></StackPanel><StackPanel Grid.Column="1"><TextBlock FontWeight="SemiBold" Text="Публичный IP"/><TextBox x:Name="PublicIpBox"/></StackPanel></Grid>
-                            <Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions><StackPanel><TextBlock FontWeight="SemiBold" Text="HTTP порт"/><TextBox x:Name="HttpPortBox" Text="15745"/></StackPanel><StackPanel Grid.Column="1"><TextBlock FontWeight="SemiBold" Text="HTTPS порт"/><TextBox x:Name="HttpsPortBox" Text="15746"/></StackPanel></Grid>
-                            <Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions><StackPanel><TextBlock FontWeight="SemiBold" Text="Секретный путь администратора"/><TextBox x:Name="AdminPathBox"/></StackPanel><StackPanel Grid.Column="1"><TextBlock FontWeight="SemiBold" Text="Секретный путь пользователей"/><TextBox x:Name="UserPathBox"/></StackPanel></Grid>
+                            <TextBlock x:Name="NetworkTitleText" FontSize="20" FontWeight="SemiBold" Text="Network"/>
+                            <TextBlock x:Name="NetworkHintText" Foreground="#5D6270" Margin="0,4,0,12" TextWrapping="Wrap" Text="Choose the publishing mode and ports."/>
+                            <TextBlock x:Name="WizardModeLabel" FontWeight="SemiBold" Text="Publishing mode"/>
+                            <ComboBox x:Name="ModeBox" SelectionChanged="ModeBox_OnSelectionChanged"><ComboBoxItem x:Name="ModeDirectItem" Tag="Direct">Public IP / direct access</ComboBoxItem><ComboBoxItem x:Name="ModeVpsItem" Tag="Vps">VPS / secure tunnel</ComboBoxItem><ComboBoxItem x:Name="ModeLocalItem" Tag="Local">Local network only</ComboBoxItem></ComboBox>
+                            <Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions><StackPanel><TextBlock x:Name="WizardBindLabel" FontWeight="SemiBold" Text="Local bind IP"/><TextBox x:Name="BindBox" Text="0.0.0.0"/></StackPanel><StackPanel Grid.Column="1"><TextBlock x:Name="WizardPublicIpLabel" FontWeight="SemiBold" Text="Public IP"/><TextBox x:Name="PublicIpBox"/></StackPanel></Grid>
+                            <Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions><StackPanel><TextBlock x:Name="WizardHttpLabel" FontWeight="SemiBold" Text="HTTP port"/><TextBox x:Name="HttpPortBox" Text="15745"/></StackPanel><StackPanel Grid.Column="1"><TextBlock x:Name="WizardHttpsLabel" FontWeight="SemiBold" Text="HTTPS port"/><TextBox x:Name="HttpsPortBox" Text="15746"/></StackPanel></Grid>
+                            <Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions><StackPanel><TextBlock x:Name="WizardAdminPathLabel" FontWeight="SemiBold" Text="Administrator secret path"/><TextBox x:Name="AdminPathBox"/></StackPanel><StackPanel Grid.Column="1"><TextBlock x:Name="WizardUserPathLabel" FontWeight="SemiBold" Text="User secret path"/><TextBox x:Name="UserPathBox"/></StackPanel></Grid>
                             <Border x:Name="VpsPanel" Background="#F5F7F8" CornerRadius="8" Padding="10" Margin="4,8,4,4" Visibility="Collapsed">
                                 <StackPanel>
-                                    <TextBlock FontWeight="SemiBold" Text="VPS / защищённый туннель" Margin="4,0,4,4"/>
-                                    <Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions><StackPanel><TextBlock FontWeight="SemiBold" Text="IP / домен VPS"/><TextBox x:Name="VpsHostBox"/></StackPanel><StackPanel Grid.Column="1"><TextBlock FontWeight="SemiBold" Text="SSH порт"/><TextBox x:Name="VpsPortBox" Text="22"/></StackPanel></Grid>
-                                    <Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions><StackPanel><TextBlock FontWeight="SemiBold" Text="SSH пользователь"/><TextBox x:Name="VpsUserBox" Text="root"/></StackPanel><StackPanel Grid.Column="1"><TextBlock FontWeight="SemiBold" Text="SSH / sudo пароль"/><PasswordBox x:Name="VpsPasswordBox"/></StackPanel></Grid>
-                                    <CheckBox x:Name="VpsSudoBox" IsChecked="True" Content="Использовать sudo для автоматической настройки VPS"/>
+                                    <TextBlock x:Name="WizardVpsSectionLabel" FontWeight="SemiBold" Text="VPS / secure tunnel" Margin="4,0,4,4"/>
+                                    <Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions><StackPanel><TextBlock x:Name="WizardVpsHostLabel" FontWeight="SemiBold" Text="VPS IP / domain"/><TextBox x:Name="VpsHostBox"/></StackPanel><StackPanel Grid.Column="1"><TextBlock x:Name="WizardVpsPortLabel" FontWeight="SemiBold" Text="SSH port"/><TextBox x:Name="VpsPortBox" Text="22"/></StackPanel></Grid>
+                                    <Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions><StackPanel><TextBlock x:Name="WizardVpsUserLabel" FontWeight="SemiBold" Text="SSH user"/><TextBox x:Name="VpsUserBox" Text="root"/></StackPanel><StackPanel Grid.Column="1"><TextBlock x:Name="WizardVpsPasswordLabel" FontWeight="SemiBold" Text="SSH / sudo password"/><PasswordBox x:Name="VpsPasswordBox"/></StackPanel></Grid>
+                                    <CheckBox x:Name="VpsSudoBox" IsChecked="True" Content="Use sudo for automatic VPS setup"/>
                                 </StackPanel>
                             </Border>
-                            <Border Background="#F5F7F8" CornerRadius="8" Padding="12" Margin="4,12,4,0"><TextBlock x:Name="NetworkCheckText" Text="Проверка ещё не выполнена." TextWrapping="Wrap"/></Border>
+                            <Border Background="#F5F7F8" CornerRadius="8" Padding="12" Margin="4,12,4,0"><TextBlock x:Name="NetworkCheckText" Text="Check has not been run yet." TextWrapping="Wrap"/></Border>
                         </StackPanel></ScrollViewer>
                     </TabItem>
                     <TabItem>
                         <ScrollViewer VerticalScrollBarVisibility="Auto"><StackPanel>
-                            <TextBlock FontSize="20" FontWeight="SemiBold" Text="Домен и HTTPS"/>
-                            <TextBlock Foreground="#5D6270" Margin="0,4,0,12" TextWrapping="Wrap" Text="Для автоматического HTTPS рекомендуется RFC2136/TSIG DNS-01. Проверка DNS выполняется до выпуска сертификата."/>
-                            <TextBlock FontWeight="SemiBold" Text="Домен"/><TextBox x:Name="DomainBox"/>
-                            <TextBlock FontWeight="SemiBold" Text="Обновление DNS"/><ComboBox x:Name="DnsModeBox" SelectionChanged="DnsModeBox_OnSelectionChanged"><ComboBoxItem Tag="Manual">Ручное / внешний DNS</ComboBoxItem><ComboBoxItem Tag="Rfc2136">RFC2136 / TSIG</ComboBoxItem></ComboBox>
+                            <TextBlock x:Name="DomainTitleText" FontSize="20" FontWeight="SemiBold" Text="Domain and HTTPS"/>
+                            <TextBlock x:Name="WizardDomainHintText" Foreground="#5D6270" Margin="0,4,0,12" TextWrapping="Wrap" Text="RFC2136/TSIG DNS-01 is recommended for automatic HTTPS."/>
+                            <TextBlock x:Name="WizardDomainLabel" FontWeight="SemiBold" Text="Domain"/><TextBox x:Name="DomainBox"/>
+                            <TextBlock x:Name="WizardDnsModeLabel" FontWeight="SemiBold" Text="DNS update"/><ComboBox x:Name="DnsModeBox" SelectionChanged="DnsModeBox_OnSelectionChanged"><ComboBoxItem x:Name="DnsManualItem" Tag="Manual">Manual / external DNS</ComboBoxItem><ComboBoxItem x:Name="DnsRfcItem" Tag="Rfc2136">RFC2136 / TSIG</ComboBoxItem></ComboBox>
                             <Border x:Name="DnsPanel" Background="#F5F7F8" CornerRadius="8" Padding="10" Margin="4,6,4,4">
                                 <StackPanel>
-                                    <Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions><StackPanel><TextBlock FontWeight="SemiBold" Text="DNS сервер обновлений"/><TextBox x:Name="DnsServerBox"/></StackPanel><StackPanel Grid.Column="1"><TextBlock FontWeight="SemiBold" Text="DNS зона"/><TextBox x:Name="DnsZoneBox"/></StackPanel></Grid>
-                                    <Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions><StackPanel><TextBlock FontWeight="SemiBold" Text="Имя TSIG-ключа"/><TextBox x:Name="DnsKeyBox"/></StackPanel><StackPanel Grid.Column="1"><TextBlock FontWeight="SemiBold" Text="Алгоритм"/><ComboBox x:Name="DnsAlgorithmBox"><ComboBoxItem Tag="hmac-sha256">HMAC-SHA256</ComboBoxItem><ComboBoxItem Tag="hmac-sha512">HMAC-SHA512</ComboBoxItem><ComboBoxItem Tag="hmac-sha1">HMAC-SHA1</ComboBoxItem></ComboBox></StackPanel></Grid>
-                                    <TextBlock FontWeight="SemiBold" Text="Секрет TSIG"/><PasswordBox x:Name="DnsSecretBox"/>
-                                    <CheckBox x:Name="DnsAutoAddressBox" IsChecked="True" Content="Автоматически обновлять A-запись на текущий публичный IPv4"/>
+                                    <Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions><StackPanel><TextBlock x:Name="WizardDnsServerLabel" FontWeight="SemiBold" Text="DNS update server"/><TextBox x:Name="DnsServerBox"/></StackPanel><StackPanel Grid.Column="1"><TextBlock x:Name="WizardDnsZoneLabel" FontWeight="SemiBold" Text="DNS zone"/><TextBox x:Name="DnsZoneBox"/></StackPanel></Grid>
+                                    <Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions><StackPanel><TextBlock x:Name="WizardDnsKeyLabel" FontWeight="SemiBold" Text="TSIG key name"/><TextBox x:Name="DnsKeyBox"/></StackPanel><StackPanel Grid.Column="1"><TextBlock x:Name="WizardDnsAlgorithmLabel" FontWeight="SemiBold" Text="Algorithm"/><ComboBox x:Name="DnsAlgorithmBox"><ComboBoxItem Tag="hmac-sha256">HMAC-SHA256</ComboBoxItem><ComboBoxItem Tag="hmac-sha512">HMAC-SHA512</ComboBoxItem><ComboBoxItem Tag="hmac-sha1">HMAC-SHA1</ComboBoxItem></ComboBox></StackPanel></Grid>
+                                    <TextBlock x:Name="WizardDnsSecretLabel" FontWeight="SemiBold" Text="TSIG secret"/><PasswordBox x:Name="DnsSecretBox"/>
+                                    <CheckBox x:Name="DnsAutoAddressBox" IsChecked="True" Content="Automatically update the A record to the current public IPv4"/>
                                 </StackPanel>
                             </Border>
-                            <TextBlock FontWeight="SemiBold" Text="Email для сертификата"/><TextBox x:Name="AcmeEmailBox"/>
-                            <CheckBox x:Name="AcmeTermsBox" IsChecked="True" Content="Я принимаю условия центра сертификации для автоматического HTTPS"/>
-                            <Border Background="#F5F7F8" CornerRadius="8" Padding="12" Margin="4,12,4,0"><TextBlock x:Name="DnsCheckText" Text="Проверка будет выполнена на финальном шаге." TextWrapping="Wrap"/></Border>
+                            <TextBlock x:Name="WizardAcmeEmailLabel" FontWeight="SemiBold" Text="Certificate email"/><TextBox x:Name="AcmeEmailBox"/>
+                            <CheckBox x:Name="AcmeTermsBox" IsChecked="True" Content="I accept the certificate authority terms for automatic HTTPS"/>
+                            <Border Background="#F5F7F8" CornerRadius="8" Padding="12" Margin="4,12,4,0"><TextBlock x:Name="DnsCheckText" Text="The check will be performed at the final step." TextWrapping="Wrap"/></Border>
                         </StackPanel></ScrollViewer>
                     </TabItem>
                     <TabItem>
                         <ScrollViewer VerticalScrollBarVisibility="Auto"><StackPanel>
-                            <TextBlock FontSize="20" FontWeight="SemiBold" Text="Аккаунт и запуск"/>
-                            <TextBlock Foreground="#5D6270" Margin="0,4,0,12" TextWrapping="Wrap" Text="Создайте администратора. При повторном запуске мастера пароль можно оставить пустым, если менять его не требуется."/>
-                            <TextBlock FontWeight="SemiBold" Text="Email администратора"/><TextBox x:Name="EmailBox"/>
-                            <Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions><StackPanel><TextBlock FontWeight="SemiBold" Text="Пароль"/><PasswordBox x:Name="PasswordBox"/></StackPanel><StackPanel Grid.Column="1"><TextBlock FontWeight="SemiBold" Text="Повторите пароль"/><PasswordBox x:Name="RepeatPasswordBox"/></StackPanel></Grid>
-                            <CheckBox x:Name="TrayAutoStartBox" IsChecked="True" Content="Запускать панель APTOFI в трее после входа в Windows"/>
-                            <Border Background="#F5F7F8" CornerRadius="8" Padding="12" Margin="4,12,4,0"><TextBlock x:Name="AccountCheckText" Text="После сохранения служба Windows будет установлена или перезапущена автоматически." TextWrapping="Wrap"/></Border>
+                            <TextBlock x:Name="AccountTitleText" FontSize="20" FontWeight="SemiBold" Text="Account and startup"/>
+                            <TextBlock x:Name="AccountHintText" Foreground="#5D6270" Margin="0,4,0,12" TextWrapping="Wrap" Text="Configure the administrator account."/>
+                            <TextBlock x:Name="WizardEmailLabel" FontWeight="SemiBold" Text="Administrator email"/><TextBox x:Name="EmailBox"/>
+                            <Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions><StackPanel><TextBlock x:Name="WizardPasswordLabel" FontWeight="SemiBold" Text="Password"/><PasswordBox x:Name="PasswordBox"/></StackPanel><StackPanel Grid.Column="1"><TextBlock x:Name="WizardRepeatLabel" FontWeight="SemiBold" Text="Repeat password"/><PasswordBox x:Name="RepeatPasswordBox"/></StackPanel></Grid>
+                            <CheckBox x:Name="TrayAutoStartBox" IsChecked="True" Content="Launch APTOFI panel in the tray after Windows sign-in"/>
+                            <Border Background="#F5F7F8" CornerRadius="8" Padding="12" Margin="4,12,4,0"><TextBlock x:Name="AccountCheckText" Text="The Windows service will be installed or restarted automatically after saving." TextWrapping="Wrap"/></Border>
                         </StackPanel></ScrollViewer>
                     </TabItem>
                     <TabItem>
                         <StackPanel>
-                            <TextBlock FontSize="20" FontWeight="SemiBold" Text="Проверка конфигурации"/>
-                            <TextBlock Foreground="#5D6270" Margin="0,4,0,12" TextWrapping="Wrap" Text="Нажмите «Проверить и запустить». Мастер сохранит настройки, проверит DNS/HTTPS и запустит службу."/>
-                            <Border Background="#F5F7F8" CornerRadius="8" Padding="12"><TextBlock x:Name="FinalResultText" Text="Готов к проверке." TextWrapping="Wrap"/></Border>
+                            <TextBlock x:Name="FinalTitleText" FontSize="20" FontWeight="SemiBold" Text="Configuration check"/>
+                            <TextBlock x:Name="FinalHintText" Foreground="#5D6270" Margin="0,4,0,12" TextWrapping="Wrap" Text="Click Check and start to validate and start the service."/>
+                            <Border Background="#F5F7F8" CornerRadius="8" Padding="12"><TextBlock x:Name="FinalResultText" Text="Ready to check." TextWrapping="Wrap"/></Border>
                             <ProgressBar x:Name="FinalProgress" Height="12" Margin="4,16,4,0" Minimum="0" Maximum="100" Value="0"/>
                         </StackPanel>
                     </TabItem>
@@ -101,8 +101,8 @@
         </Grid>
         <Grid Grid.Row="2" Margin="0,12,0,0">
             <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-            <Button x:Name="CancelButton" Content="Закрыть" HorizontalAlignment="Left" Click="CancelButton_OnClick"/>
-            <StackPanel Grid.Column="1" Orientation="Horizontal"><Button x:Name="BackButton" Content="Назад" Click="BackButton_OnClick"/><Button x:Name="NextButton" Content="Далее" Background="#FFD33D" FontWeight="SemiBold" Click="NextButton_OnClick"/></StackPanel>
+            <Button x:Name="CancelButton" Content="Close" HorizontalAlignment="Left" Click="CancelButton_OnClick"/>
+            <StackPanel Grid.Column="1" Orientation="Horizontal"><Button x:Name="BackButton" Content="Back" Click="BackButton_OnClick"/><Button x:Name="NextButton" Content="Next" Background="#FFD33D" FontWeight="SemiBold" Click="NextButton_OnClick"/></StackPanel>
         </Grid>
     </Grid>
 </Window>

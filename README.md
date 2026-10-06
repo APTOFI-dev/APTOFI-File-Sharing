@@ -76,12 +76,4 @@ The configured HTTPS port accepts HTTPS only. With the default ports, use `https
 - Reorders the control panel into Overview, Storage, Network, Domain and HTTPS, Account and startup, and Logs.
 - Adds severity-colored log rows, filters, copy/open/refresh/clear-display actions and visual aggregation of repeated messages.
 - Documents that APTOFI.COM cannot guarantee third-party routing, ISP/NAT/firewall/DNS/provider/CA behavior or uninterrupted availability; deployment-specific network configuration remains the operator's responsibility.
-
-## 1.1.35
-
-- Fixes folder-upload stalls at the logical chunk boundary by making the server read exactly the current HTTP request body instead of waiting for the remaining full file size.
-- Adds a 45-second server-side receive inactivity watchdog that closes a stalled request, persists the confirmed offset and releases the per-upload lock for a clean resumable retry.
-- Replaces the browser's absolute three-minute XHR timeout with a 45-second inactivity watchdog that resets on upload/network activity.
-- Uses at most 8 MiB request chunks for recursive folder uploads while retaining the configured block size for ordinary uploads, reducing recovery cost on unstable links.
-- Keeps successful chunk access-log suppression but emits concise `upload-read-timeout` / I/O diagnostics only when a transfer actually stalls.
-
+- Fixes control-panel localization so Overview health/DNS/certificate messages, Diagnostics and the setup wizard use the selected UI language instead of hard-coded Russian text; all 10 supported control-panel languages now include the 1.1.36 runtime strings.

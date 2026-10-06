@@ -18,7 +18,23 @@ namespace APTOFI.FileSharing
             InitializeComponent();
             _owner = owner ?? throw new ArgumentNullException(nameof(owner));
             Owner = owner;
+            ApplyLanguage();
             Loaded += async (s, e) => await RunAsync();
+        }
+
+        private string T(string key)
+        {
+            return UiText.Get(_owner.CurrentLanguage, key);
+        }
+
+        private void ApplyLanguage()
+        {
+            Title = AppVersion.ProductName + " — " + T("diagnostics");
+            HeadingText.Text = T("diagnostics") + " APTOFI File Sharing";
+            SummaryText.Text = T("diagnosticsNotRun");
+            RunButton.Content = T("runDiagnostics");
+            CopyButton.Content = T("copyResult");
+            CloseButton.Content = T("close");
         }
 
         private async void RunButton_OnClick(object sender, RoutedEventArgs e)
@@ -30,11 +46,11 @@ namespace APTOFI.FileSharing
         {
             RunButton.IsEnabled = false;
             ResultsList.Items.Clear();
-            SummaryText.Text = "Выполняется диагностика...";
+            SummaryText.Text = T("diagnosticsRunning");
             try
             {
                 _lastReport = await _owner.RunControlDiagnosticsAsync(true);
-                SummaryText.Text = _lastReport.Summary + "  Проверено: " + _lastReport.CheckedUtc.ToLocalTime().ToString("G");
+                SummaryText.Text = _lastReport.Summary + "  " + T("diagnosticsChecked") + " " + _lastReport.CheckedUtc.ToLocalTime().ToString("G");
                 SummaryText.Foreground = BrushFor(_lastReport.Level);
                 foreach (var item in _lastReport.Items)
                 {
@@ -43,7 +59,7 @@ namespace APTOFI.FileSharing
                     var title = new TextBlock { FontWeight = FontWeights.SemiBold, Foreground = BrushFor(item.Level), Text = Prefix(item.Level) + " " + item.Name + " — " + item.Message, TextWrapping = TextWrapping.Wrap };
                     panel.Children.Add(title);
                     if (!string.IsNullOrWhiteSpace(item.Recommendation))
-                        panel.Children.Add(new TextBlock { Margin = new Thickness(0, 4, 0, 0), Foreground = Brushes.DimGray, Text = "Рекомендация: " + item.Recommendation, TextWrapping = TextWrapping.Wrap });
+                        panel.Children.Add(new TextBlock { Margin = new Thickness(0, 4, 0, 0), Foreground = Brushes.DimGray, Text = T("recommendation") + " " + item.Recommendation, TextWrapping = TextWrapping.Wrap });
                     border.Child = panel;
                     ResultsList.Items.Add(border);
                 }
@@ -70,7 +86,7 @@ namespace APTOFI.FileSharing
             {
                 sb.AppendLine(Prefix(item.Level) + " " + item.Name + ": " + item.Message);
                 if (!string.IsNullOrWhiteSpace(item.Recommendation))
-                    sb.AppendLine("  Recommendation: " + item.Recommendation);
+                    sb.AppendLine("  " + T("recommendation") + " " + item.Recommendation);
             }
             try
             {

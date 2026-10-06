@@ -4,6 +4,7 @@ Current test version: **1.1.36**
 
 ## 1.1.36
 
+- Fixes a 1.1.36 localization regression: Overview health/DNS/certificate messages, Diagnostics and the setup wizard now use the selected control-panel language instead of hard-coded Russian strings; all 10 supported UI languages include the new runtime texts.
 - Keeps RFC2136/TSIG provider-independent and self-contained; no external BIND/nsupdate dependency is required.
 - Detects public IPv4 through multiple independent providers with bounded per-provider timeouts, avoiding a single bad CDN route from stalling DNS maintenance.
 - Changes configured-mode DNS maintenance from noisy 10-minute polling to quiet best-effort synchronization: one startup attempt, hourly checks only when automatic A updates are enabled, and a silent 15-minute retry after a transient failure.

@@ -800,7 +800,7 @@ namespace APTOFI.FileSharing
                         var secureReady = s.PublicMode == "Local" || !s.EnableHttps || !string.IsNullOrWhiteSpace(s.CertificateThumbprint);
                         OverviewPublicBox.Text = string.IsNullOrWhiteSpace(secureBaseUrl) ? "—" : secureBaseUrl;
                         OverviewUserLoginBox.Text = secureReady && !string.IsNullOrWhiteSpace(secureBaseUrl) ? secureBaseUrl.TrimEnd('/') + HttpUtil.NormalizeSecretPath(s.UserPath, "/user_login_disk") : "—";
-                        OverviewSchemeHint.Text = s.PublicMode == "Local" ? "HTTP " + s.HttpPort : "HTTP " + s.HttpPort + " → HTTPS " + s.HttpsPort + ". HTTPS " + s.HttpsPort + " accepts only https:// connections.";
+                        OverviewSchemeHint.Text = s.PublicMode == "Local" ? string.Format(UiText.Get(_language, "overviewHttpOnly"), s.HttpPort) : string.Format(UiText.Get(_language, "overviewHttpToHttps"), s.HttpPort, s.HttpsPort);
                         OverviewHttpsText.Text = !s.EnableHttps ? UiText.Get(_language, "httpsDisabled") : string.IsNullOrWhiteSpace(s.CertificateThumbprint) ? UiText.Get(_language, "httpsPending") : UiText.Get(_language, "httpsReady");
                         CopyPublicButton.IsEnabled = !string.IsNullOrWhiteSpace(secureBaseUrl);
                         CopyUserLoginButton.IsEnabled = OverviewUserLoginBox.Text != "—";
@@ -1045,7 +1045,7 @@ namespace APTOFI.FileSharing
                 return false;
             var text = line.Trim();
             if ((text.IndexOf("dns-maintenance-error", StringComparison.OrdinalIgnoreCase) >= 0 || text.IndexOf("dns-address-error", StringComparison.OrdinalIgnoreCase) >= 0) &&
-                (text.IndexOf("TaskCanceledException", StringComparison.OrdinalIgnoreCase) >= 0 || text.IndexOf("Отменена задача", StringComparison.OrdinalIgnoreCase) >= 0))
+                text.IndexOf("TaskCanceledException", StringComparison.OrdinalIgnoreCase) >= 0)
                 return true;
             if ((text.IndexOf("ip=127.0.0.1", StringComparison.OrdinalIgnoreCase) >= 0 || text.IndexOf("ip=::1", StringComparison.OrdinalIgnoreCase) >= 0) &&
                 text.IndexOf("method=GET", StringComparison.OrdinalIgnoreCase) >= 0 &&
@@ -1629,6 +1629,8 @@ namespace APTOFI.FileSharing
             LogTextBox.Text = string.Empty;
         }
 
+        internal string CurrentLanguage { get { return _language; } }
+
         internal SetupWizardData GetWizardData()
         {
             var primary = _storageLocations.FirstOrDefault();
@@ -1665,7 +1667,7 @@ namespace APTOFI.FileSharing
             if (data == null)
                 throw new ArgumentNullException(nameof(data));
             progress = progress ?? (_ => { });
-            progress(new WizardProgress { Percent = 10, Text = "Применяем параметры мастера..." });
+            progress(new WizardProgress { Percent = 10, Text = UiText.Get(_language, "wizardProgressApply") });
             if (_storageLocations.Count == 0)
                 _storageLocations.Add(new StorageLocationSetting { Id = "primary", Enabled = true });
             _storageLocations[0].Path = data.StoragePath;
@@ -1702,7 +1704,7 @@ namespace APTOFI.FileSharing
             ModeBox_OnSelectionChanged(null, null);
             DnsModeBox_OnSelectionChanged(null, null);
 
-            progress(new WizardProgress { Percent = 25, Text = "Сохраняем конфигурацию и учётную запись..." });
+            progress(new WizardProgress { Percent = 25, Text = UiText.Get(_language, "wizardProgressSave") });
             await SaveConfigurationAsync();
             ApplyTrayAutoStartSetting();
 
@@ -1712,7 +1714,7 @@ namespace APTOFI.FileSharing
                 var settings = db.GetSettings();
                 if (DnsUpdateService.IsConfigured(settings))
                 {
-                    progress(new WizardProgress { Percent = 40, Text = "Проверяем RFC2136/TSIG и A-запись..." });
+                    progress(new WizardProgress { Percent = 40, Text = UiText.Get(_language, "wizardProgressDns") });
                     using (var log = new LogService())
                     {
                         var dns = new DnsUpdateService(db, crypto, log);
@@ -1723,7 +1725,7 @@ namespace APTOFI.FileSharing
                 }
             }
 
-            progress(new WizardProgress { Percent = 55, Text = "Проверяем Windows Firewall..." });
+            progress(new WizardProgress { Percent = 55, Text = UiText.Get(_language, "wizardProgressFirewall") });
             var windows = new WindowsNetworkService();
             AppSettings saved;
             using (var db = new Database(new CryptoService()))
@@ -1734,18 +1736,18 @@ namespace APTOFI.FileSharing
 
             if (string.Equals(saved.PublicMode, "Vps", StringComparison.OrdinalIgnoreCase))
             {
-                progress(new WizardProgress { Percent = 65, Text = "Настраиваем VPS-туннель..." });
+                progress(new WizardProgress { Percent = 65, Text = UiText.Get(_language, "wizardProgressVps") });
                 await ConfigureVpsIfNeededAsync();
             }
 
             if (string.Equals(saved.PublicMode, "Direct", StringComparison.OrdinalIgnoreCase) && saved.EnableHttps)
             {
-                progress(new WizardProgress { Percent = 70, Text = "Выпускаем и устанавливаем HTTPS-сертификат..." });
+                progress(new WizardProgress { Percent = 70, Text = UiText.Get(_language, "wizardProgressCertificate") });
                 await ConfigureHttpsAsync(false);
             }
             else
             {
-                progress(new WizardProgress { Percent = 75, Text = "Устанавливаем или перезапускаем службу Windows..." });
+                progress(new WizardProgress { Percent = 75, Text = UiText.Get(_language, "wizardProgressService") });
                 var serviceResult = _serviceInstaller.IsInstalled() ? _serviceInstaller.RestartInternal() : _serviceInstaller.InstallInternal();
                 if (!serviceResult.Success)
                     throw new InvalidOperationException(serviceResult.Output);
@@ -1754,16 +1756,16 @@ namespace APTOFI.FileSharing
             _configured = true;
             if (_trayIcon != null)
                 _trayIcon.Visible = true;
-            progress(new WizardProgress { Percent = 88, Text = "Проверяем фактическое состояние сервера..." });
+            progress(new WizardProgress { Percent = 88, Text = UiText.Get(_language, "wizardProgressHealth") });
             var report = await RunControlDiagnosticsAsync(true);
             if (report.Level == ControlHealthLevel.Error)
-                throw new InvalidOperationException(report.Summary + " Откройте «Диагностика» для подробностей.");
+                throw new InvalidOperationException(report.Summary + " " + UiText.Get(_language, "wizardOpenDiagnostics"));
             RefreshRuntimeSummary();
             MainTabs.SelectedItem = OverviewTab;
-            progress(new WizardProgress { Percent = 100, Text = "APTOFI File Sharing готов к работе." });
+            progress(new WizardProgress { Percent = 100, Text = UiText.Get(_language, "wizardReady") });
             return report.Level == ControlHealthLevel.Warning
-                ? "APTOFI File Sharing запущен, но есть предупреждения. Откройте «Диагностика» для проверки."
-                : "APTOFI File Sharing настроен и работает. Все основные проверки пройдены.";
+                ? UiText.Get(_language, "wizardReadyWarnings")
+                : UiText.Get(_language, "wizardReadyOk");
         }
 
         internal async Task<ControlHealthReport> RunControlDiagnosticsAsync(bool deepDnsTest)
@@ -1784,7 +1786,7 @@ namespace APTOFI.FileSharing
             }
             catch (Exception ex)
             {
-                AddHealth(report, "database", "База данных", ControlHealthLevel.Error, ex.Message, "Проверьте файлы базы и права доступа рядом с afsharing.exe.");
+                AddHealth(report, "database", UiText.Get(_language, "healthDatabase"), ControlHealthLevel.Error, ex.Message, UiText.Get(_language, "healthDatabaseRecommendation"));
             }
 
             if (settings != null)
@@ -1803,14 +1805,14 @@ namespace APTOFI.FileSharing
                 }
 
                 AddHealth(report, "http", UiText.Get(_language, "healthHttp"), httpOk ? ControlHealthLevel.Ok : ControlHealthLevel.Error,
-                    httpOk ? "HTTP " + settings.HttpPort + " слушается" : "HTTP " + settings.HttpPort + " не слушается",
-                    httpOk ? null : "Проверьте службу Windows и занятость HTTP-порта.");
+                    httpOk ? string.Format(UiText.Get(_language, "healthHttpListening"), settings.HttpPort) : string.Format(UiText.Get(_language, "healthHttpNotListening"), settings.HttpPort),
+                    httpOk ? null : UiText.Get(_language, "healthHttpRecommendation"));
 
                 if (settings.EnableHttps)
                 {
                     AddHealth(report, "https", UiText.Get(_language, "healthHttps"), httpsOk ? ControlHealthLevel.Ok : ControlHealthLevel.Error,
-                        httpsOk ? "HTTPS " + settings.HttpsPort + " слушается" : "HTTPS " + settings.HttpsPort + " не слушается",
-                        httpsOk ? null : "Проверьте сертификат, HTTPS-привязку и службу Windows.");
+                        httpsOk ? string.Format(UiText.Get(_language, "healthHttpsListening"), settings.HttpsPort) : string.Format(UiText.Get(_language, "healthHttpsNotListening"), settings.HttpsPort),
+                        httpsOk ? null : UiText.Get(_language, "healthHttpsRecommendation"));
                 }
                 else
                 {
@@ -1826,12 +1828,12 @@ namespace APTOFI.FileSharing
                         if (string.IsNullOrWhiteSpace(location.Path) || !Directory.Exists(location.Path))
                         {
                             storageOk = false;
-                            storageMessage.Add((location.Path ?? "<empty>") + " недоступен");
+                            storageMessage.Add(string.Format(UiText.Get(_language, "healthStorageUnavailable"), location.Path ?? "<empty>"));
                         }
                         else
                         {
                             var drive = new DriveInfo(Path.GetPathRoot(Path.GetFullPath(location.Path)));
-                            storageMessage.Add(location.Path + " — свободно " + FormatBytes(drive.AvailableFreeSpace));
+                            storageMessage.Add(string.Format(UiText.Get(_language, "healthStorageFree"), location.Path, FormatBytes(drive.AvailableFreeSpace)));
                         }
                     }
                     catch (Exception ex)
@@ -1841,8 +1843,8 @@ namespace APTOFI.FileSharing
                     }
                 }
                 AddHealth(report, "storage", UiText.Get(_language, "healthStorage"), storageOk ? ControlHealthLevel.Ok : ControlHealthLevel.Error,
-                    storageMessage.Count == 0 ? "Хранилище не настроено" : string.Join("; ", storageMessage),
-                    storageOk ? null : "Проверьте подключение диска, путь и права записи.");
+                    storageMessage.Count == 0 ? UiText.Get(_language, "healthStorageNotConfigured") : string.Join("; ", storageMessage),
+                    storageOk ? null : UiText.Get(_language, "healthStorageRecommendation"));
 
                 if (!string.IsNullOrWhiteSpace(settings.Domain))
                 {
@@ -1853,30 +1855,30 @@ namespace APTOFI.FileSharing
                             var addresses = await Dns.GetHostAddressesAsync(settings.Domain);
                             var ipv4 = addresses.FirstOrDefault(x => x.AddressFamily == AddressFamily.InterNetwork);
                             var level = ipv4 == null ? ControlHealthLevel.Error : ControlHealthLevel.Ok;
-                            var message = ipv4 == null ? "A-запись не найдена" : settings.Domain + " → " + ipv4;
+                            var message = ipv4 == null ? UiText.Get(_language, "healthDnsARecordNotFound") : settings.Domain + " → " + ipv4;
                             AddHealth(report, "dns", UiText.Get(_language, "healthDns"), level, message,
-                                level == ControlHealthLevel.Ok ? null : "Проверьте домен и DNS-сервер.");
+                                level == ControlHealthLevel.Ok ? null : UiText.Get(_language, "healthDnsRecommendation"));
                         }
                         catch (Exception ex)
                         {
-                            AddHealth(report, "dns", UiText.Get(_language, "healthDns"), ControlHealthLevel.Error, ex.Message, "Проверьте домен и DNS-сервер.");
+                            AddHealth(report, "dns", UiText.Get(_language, "healthDns"), ControlHealthLevel.Error, ex.Message, UiText.Get(_language, "healthDnsRecommendation"));
                         }
                     }
                     else if (DnsUpdateService.IsConfigured(settings))
                     {
-                        var message = settings.DnsAutoUpdateAddress ? "RFC2136/TSIG настроен · автообновление A включено" : "RFC2136/TSIG настроен · автообновление A выключено";
+                        var message = UiText.Get(_language, settings.DnsAutoUpdateAddress ? "healthDnsConfiguredAutoOn" : "healthDnsConfiguredAutoOff");
                         if (settings.LastDnsUpdateUtc.HasValue)
-                            message += " · последняя успешная синхронизация " + settings.LastDnsUpdateUtc.Value.ToLocalTime().ToString("G");
+                            message += " · " + string.Format(UiText.Get(_language, "healthDnsLastSync"), settings.LastDnsUpdateUtc.Value.ToLocalTime().ToString("G"));
                         AddHealth(report, "dns", UiText.Get(_language, "healthDns"), ControlHealthLevel.Ok, message, null);
                     }
                     else
                     {
-                        AddHealth(report, "dns", UiText.Get(_language, "healthDns"), ControlHealthLevel.Unknown, "Внешний DNS · проверяется только вручную", null);
+                        AddHealth(report, "dns", UiText.Get(_language, "healthDns"), ControlHealthLevel.Unknown, UiText.Get(_language, "healthDnsExternalManual"), null);
                     }
                 }
                 else
                 {
-                    AddHealth(report, "dns", UiText.Get(_language, "healthDns"), ControlHealthLevel.Unknown, "Домен не настроен", null);
+                    AddHealth(report, "dns", UiText.Get(_language, "healthDns"), ControlHealthLevel.Unknown, UiText.Get(_language, "healthDomainNotConfigured"), null);
                 }
 
                 if (deepDnsTest && DnsUpdateService.IsConfigured(settings))
@@ -1890,20 +1892,20 @@ namespace APTOFI.FileSharing
                             var dns = new DnsUpdateService(db, crypto, log);
                             var result = await dns.TestAsync(settings);
                             AddHealth(report, "dns_update", "RFC2136 / TSIG", result.Success ? ControlHealthLevel.Ok : ControlHealthLevel.Error,
-                                result.Success ? "DNS UPDATE выполнен успешно" : result.Error,
-                                result.Success ? null : "Проверьте DNS zone, имя/алгоритм/secret TSIG и сетевой маршрут до DNS-провайдера.");
+                                result.Success ? UiText.Get(_language, "healthDnsUpdateSuccess") : result.Error,
+                                result.Success ? null : UiText.Get(_language, "healthDnsUpdateRecommendation"));
                         }
                     }
                     catch (Exception ex)
                     {
-                        AddHealth(report, "dns_update", "RFC2136 / TSIG", ControlHealthLevel.Error, ex.Message, "Проверьте параметры TSIG и журнал приложения.");
+                        AddHealth(report, "dns_update", "RFC2136 / TSIG", ControlHealthLevel.Error, ex.Message, UiText.Get(_language, "healthTsigRecommendation"));
                     }
                 }
 
                 if (settings.EnableHttps)
                 {
                     var certLevel = ControlHealthLevel.Error;
-                    var certMessage = "Сертификат не установлен";
+                    var certMessage = UiText.Get(_language, "healthCertNotInstalled");
                     try
                     {
                         if (!string.IsNullOrWhiteSpace(settings.CertificateThumbprint))
@@ -1917,7 +1919,7 @@ namespace APTOFI.FileSharing
                                     var cert = found[0];
                                     var remaining = cert.NotAfter.ToUniversalTime() - DateTime.UtcNow;
                                     certLevel = remaining.TotalDays <= 7 ? ControlHealthLevel.Warning : remaining.TotalSeconds > 0 ? ControlHealthLevel.Ok : ControlHealthLevel.Error;
-                                    certMessage = "Действителен до " + cert.NotAfter.ToLocalTime().ToString("G") + " (" + Math.Max(0, (int)remaining.TotalDays) + " дн.)";
+                                    certMessage = string.Format(UiText.Get(_language, "healthCertValidUntil"), cert.NotAfter.ToLocalTime().ToString("G"), Math.Max(0, (int)remaining.TotalDays));
                                 }
                             }
                         }
@@ -1927,19 +1929,19 @@ namespace APTOFI.FileSharing
                         certMessage = ex.Message;
                     }
                     AddHealth(report, "certificate", UiText.Get(_language, "healthCertificate"), certLevel, certMessage,
-                        certLevel == ControlHealthLevel.Ok ? null : "На вкладке «Домен и HTTPS» проверьте DNS и настройте HTTPS.");
+                        certLevel == ControlHealthLevel.Ok ? null : UiText.Get(_language, "healthCertRecommendation"));
                 }
                 else
                 {
-                    AddHealth(report, "certificate", UiText.Get(_language, "healthCertificate"), ControlHealthLevel.Unknown, "Не требуется в локальном режиме", null);
+                    AddHealth(report, "certificate", UiText.Get(_language, "healthCertificate"), ControlHealthLevel.Unknown, UiText.Get(_language, "healthCertLocalNotRequired"), null);
                 }
 
                 if (string.Equals(settings.PublicMode, "Local", StringComparison.OrdinalIgnoreCase))
-                    AddHealth(report, "external", UiText.Get(_language, "healthExternal"), ControlHealthLevel.Unknown, "Локальный режим", null);
+                    AddHealth(report, "external", UiText.Get(_language, "healthExternal"), ControlHealthLevel.Unknown, UiText.Get(_language, "healthExternalLocalMode"), null);
                 else if (deepDnsTest)
-                    AddHealth(report, "external", UiText.Get(_language, "healthExternal"), ControlHealthLevel.Unknown, UiText.Get(_language, "externalNotChecked"), "Публичная доступность зависит от маршрутизации, NAT, firewall, DNS и провайдера. При необходимости проверьте с внешней сети.");
+                    AddHealth(report, "external", UiText.Get(_language, "healthExternal"), ControlHealthLevel.Unknown, UiText.Get(_language, "externalNotChecked"), UiText.Get(_language, "healthExternalRecommendation"));
                 else
-                    AddHealth(report, "external", UiText.Get(_language, "healthExternal"), ControlHealthLevel.Unknown, "Не проверяется в обычном режиме", null);
+                    AddHealth(report, "external", UiText.Get(_language, "healthExternal"), ControlHealthLevel.Unknown, UiText.Get(_language, "healthExternalNormalMode"), null);
             }
 
             report.Level = report.Items.Any(x => x.Level == ControlHealthLevel.Error) ? ControlHealthLevel.Error
@@ -1998,7 +2000,7 @@ namespace APTOFI.FileSharing
             if (_lastHealthLevel != ControlHealthLevel.Unknown && _lastHealthLevel != report.Level && report.Level == ControlHealthLevel.Error && _trayIcon != null)
             {
                 _trayIcon.BalloonTipTitle = AppVersion.ProductName;
-                _trayIcon.BalloonTipText = "Обнаружена проблема в работе сервера. Откройте «Диагностика».";
+                _trayIcon.BalloonTipText = UiText.Get(_language, "healthTrayProblem");
                 _trayIcon.ShowBalloonTip(5000);
             }
             _lastHealthLevel = report.Level;
