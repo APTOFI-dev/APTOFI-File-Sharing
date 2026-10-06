@@ -1,5 +1,8 @@
 # APTOFI File Sharing 1.1.36
 
+<img width="963" height="741" alt="APTOFI File Sharing 1 1 36" src="https://github.com/user-attachments/assets/0a735c5e-67f5-41e8-bbd4-f68c06422fa3" />
+
+
 Self-hosted Windows file sharing server for Windows 7 SP1 through Windows 11.
 
 **Author:** [APTOFI.COM](https://aptofi.com/?utm_source=afsharing&utm_medium=software&utm_campaign=aptofi_file_sharing)
